@@ -3,9 +3,13 @@ Description=System Sensor service
 After=multi-user.target
 
 [Service]
-User=gughan
+User=pi
 Type=idle
-ExecStart=/usr/bin/python3 /home/gughan/system_sensors/src/system_sensors.py /home/gughan/system_sensors/src/settings.yaml
+
+# If your "settings.yaml" is in the same folder of the "system_sensor.py" you can try:
+# ExecStart=/usr/bin/python3 /home/pi/system_sensors/src/system_sensors.py 
+
+ExecStart=/usr/bin/python3 /home/pi/system_sensors/src/system_sensors.py --settings /home/pi/system_sensors/src/settings.yaml
 
 [Install]
 WantedBy=multi-user.target
