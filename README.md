@@ -1,4 +1,6 @@
-# RPI System sensors
+# Sys-QTT (System-Cutie)
+
+Fork of @Sennevds `System-Sensors` project.
 
 [![GitHub Release][releases-shield]][releases]
 [![License][license-shield]](LICENSE.md)
@@ -8,10 +10,12 @@
 
 [![Community Forum][forum-shield]][forum]
 
-I’ve created a simple python script that runs every 60 seconds and sends several system data over MQTT. It uses the MQTT Discovery for Home Assistant so you don’t need to configure anything in Home Assistant if you have discovery enabled for MQTT
+Sys-QTT is a light-weight, Python-based system metrics service that periodically sends host stats about the client to an MQTT broker/server.
 
-It currently logs the following data:
+This service integrates with home automation platforms, like Home Assistant, but can be used in any situations that MQTT  
 
+
+Sys-QTT currently logs the following data:
 - CPU usage
 - CPU temperature
 - CPU Clock Speed
