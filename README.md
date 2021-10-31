@@ -22,6 +22,7 @@ The `settings.yaml` file provides a selection from the following metrics:
 ## Roadmap
 - [x] Add board make and model sensors
 - [x] Comprehensive logging for debug
+- [ ] Clean up the project file structure
 - [ ] Install and update script
 
 ## Requirements
