@@ -2,11 +2,16 @@
 
 import time, pytz, psutil, socket, platform, subprocess
 from datetime import datetime as dt, timedelta as td
-from console_colours import *
+from c_print import *
+from utils import quick_cat
 
 rpi_power_disabled = True
 under_voltage = None
 apt_disabled = True
+
+system_hw = {'make':'Unknown','model':'Unknown'}
+hardware_path_other = '/sys/devices/virtual/dmi/id/'
+hardware_path_raspi = '/sys/firmware/devicetree/base/model'
 
 _os_data = {}
 _previous_net_data = psutil.net_io_counters()
@@ -36,6 +41,26 @@ with open('/etc/os-release') as f:
     for line in f.readlines():
         row = line.strip().split("=")
         _os_data[row[0]] = row[1].strip('"')
+
+def get_make() -> str:
+    return system_hw['make']
+def get_model() -> str:
+    return system_hw['model']
+
+# Check for hardware details in Raspberry Pi path
+hw_output = quick_cat(hardware_path_raspi)
+if hw_output != None and 'Raspberry Pi' in hw_output:
+    system_hw['make'] = 'Raspberry Pi'
+    system_hw['model'] = hw_output[hw_output.rfind(system_hw['make'])+len(system_hw['make']):].strip()
+else:
+    # Otherwise check for hardware details in standard linux path
+    hw_output = quick_cat(f'{hardware_path_other}/board_vendor')
+    if hw_output != None:
+        system_hw['make'] = hw_output.strip()
+    hw_output = quick_cat(f'{hardware_path_other}/board_name')
+    if hw_output != None:
+        system_hw['model'] = hw_output.strip()
+
 
 def set_default_timezone(timezone) -> None:
     global _default_timezone
@@ -78,7 +103,7 @@ def get_temp() -> float:
             # Assumes that first entry is the CPU package, have not tested this on other systems except my NUC x86
             temp = psutil.sensors_temperatures()['coretemp'][0].current
         except Exception as e:
-            write_message_to_console(f'Could not establish CPU temperature reading: {text_color.B_FAIL}{e}', tab=1, status='warning')
+            c_print(f'Could not establish CPU temperature reading: {text_color.B_FAIL}{e}', tab=1, status='warning')
             raise
     return round(temp, 1)
 
@@ -91,14 +116,14 @@ def get_disk_usage(path) -> float:
         disk_percentage = psutil.disk_usage(path).percent
         return disk_percentage
     except Exception as e:
-        write_message_to_console(f'Could not get disk usage from {text_color.B_WHITE}{path}{text_color.RESET}: {text_color.B_FAIL}{e}', tab=1, status='warning')
+        c_print(f'Could not get disk usage from {text_color.B_HLIGHT}{path}{text_color.RESET}: {text_color.B_FAIL}{e}', tab=1, status='warning')
         raise
 
 def get_memory_usage() -> float:
-    return str(psutil.virtual_memory().percent)
+    return psutil.virtual_memory().percent
 
 def get_load(arg) -> float:
-    return str(psutil.getloadavg()[arg])
+    return psutil.getloadavg()[arg]
 
 def get_net_data(arg) -> float:
     global _previous_net_data
@@ -115,10 +140,10 @@ def get_net_data(arg) -> float:
     return net_data[arg]
 
 def get_cpu_usage() -> float:
-    return str(psutil.cpu_percent(interval=None))
+    return psutil.cpu_percent(interval=None)
 
 def get_swap_usage() -> float:
-    return str(psutil.swap_memory().percent)
+    return psutil.swap_memory().percent
 
 def get_wifi_strength() -> int:
     wifi_strength_value = subprocess.check_output(
@@ -130,7 +155,7 @@ def get_wifi_strength() -> int:
                           ).decode('utf-8').rstrip()
     if not wifi_strength_value:
         wifi_strength_value = '0'
-    return (wifi_strength_value)
+    return int(wifi_strength_value)
 
 def get_wifi_ssid() -> str:
     ssid = 'UNKNOWN'
@@ -142,11 +167,8 @@ def get_wifi_ssid() -> str:
                                       '/usr/sbin/iwgetid -r',
                                   ]
                               ).decode('utf-8').rstrip()
-        print(ssid)
     except Exception as e:
-        write_message_to_console(f'Could not deterine WiFi SSID: {text_color.B_FAIL}{e}', tab=1, status='warning')
-    
-    print(ssid)
+        c_print(f'Could not deterine WiFi SSID: {text_color.B_FAIL}{e}', tab=1, status='warning')
     return ssid
 
 def get_rpi_power_status() -> str:
@@ -284,6 +306,16 @@ sensor_objects = {
                  'icon': 'chip',
                  'sensor_type': 'sensor',
                  'function': get_host_arch},
+          'hardware_make':
+                {'name': 'Hardware Make',
+                 'icon': 'domain',
+                 'sensor_type': 'sensor',
+                 'function': get_make},
+          'hardware_model':
+                {'name': 'Hardware Model',
+                 'icon': 'package',
+                 'sensor_type': 'sensor',
+                 'function': get_model},
           'last_message':
                 {'name': 'Last Message',
                  'class': 'timestamp',
