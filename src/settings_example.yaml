@@ -1,12 +1,13 @@
 mqtt:
-  hostname: 127.0.0.1
-  port: 1883 #defaults to 1883
-  user: test
-  password: test
-deviceName: test
-client_id: test
-timezone: Europe/Brussels
-update_interval: 60 #Defaults to 60
+  hostname: 127.0.0.1       # MQTT broker address (required)
+  port: 1883                # MQTT broker port (defaults to 1883)
+  user: username            # Username for MQTT credentials (required)
+  password: secret          # Username for MQTT credentials (required)
+  connection_retry: 10      # Seconds between reconnection attempts if disconnected (default 10)
+deviceName: Example Client  # Pretty/display name sent with this MQTT topic (required)
+client_id: example_client   # Client ID/name of this device for the MQTT broker (required)
+timezone: Europe/Brussels   # The system's local timezone (required)
+update_interval: 60         # Seconds between updating sensor values and publishing to broker (default 60)
 sensors:
   temperature: true
   clock_speed: true
@@ -25,10 +26,11 @@ sensors:
   host_ip: true
   host_os: true
   host_arch: true
+  hardware_make: true
+  hardware_model: true
   last_message: true
   updates: true
   wifi_strength: true
   wifi_ssid: true
-  external_drives:
-    # Only add mounted drives here, e.g.:
+  external_drives: # Only add mounted drives here, e.g.:
     # Drive1: /media/storage
