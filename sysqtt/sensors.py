@@ -14,25 +14,26 @@ hardware_path_other = '/sys/devices/virtual/dmi/id/'
 hardware_path_raspi = '/sys/firmware/devicetree/base/model'
 
 _os_data = {}
-_previous_net_data = psutil.net_io_counters()
-_previous_time = time.time() - 10
+tx_previous = psutil.net_io_counters()
+time_previous = time.time() - 10 # Why minus 10?
 _default_timezone = None
 _utc = pytz.utc
 
-# Test for Raspberry PI power module
-try:
-    from rpi_bad_power import new_under_voltage
-    if new_under_voltage() is not None:
-        # Only enable if import works and function returns a value
-        rpi_power_disabled = False
-        under_voltage = new_under_voltage()
-except ImportError:
-    pass
 
-# Test for APT module
+# Test for apt module for reporting update metric
 try:
     import apt
     apt_disabled = False
+except ImportError:
+    pass
+
+
+# Test for Raspberry PI power reporting module
+try:
+    from rpi_bad_power import new_under_voltage
+    if new_under_voltage() is not None:
+        rpi_power_disabled = False
+        under_voltage = new_under_voltage()
 except ImportError:
     pass
 
@@ -42,70 +43,64 @@ with open('/etc/os-release') as f:
         row = line.strip().split("=")
         _os_data[row[0]] = row[1].strip('"')
 
-def get_make() -> str:
-    return system_board['make']
-def get_model() -> str:
-    return system_board['model']
 
-# Check for hardware details in Raspberry Pi path
-hw_output = quick_cat(hardware_path_raspi)
-if hw_output != None and 'Raspberry Pi' in hw_output:
-    system_board['make'] = 'Raspberry Pi'
-    system_board['model'] = hw_output[hw_output.rfind(system_board['make'])+len(system_board['make']):].strip()
-else:
-    # Otherwise check for hardware details in standard linux path
-    hw_output = quick_cat(f'{hardware_path_other}/board_vendor')
-    if hw_output != None:
-        system_board['make'] = hw_output.strip()
-    hw_output = quick_cat(f'{hardware_path_other}/board_name')
-    if hw_output != None:
-        system_board['model'] = hw_output.strip()
+def get_board_info(arg) -> str:
+    """Return details about the host's motherboard. 'make' and 'model' are supprted arguments"""
+    # Raspberry Pi path first
+    if (reading := quick_cat(hardware_path_raspi)) is not None and 'Raspberry Pi' in reading:
+        if arg == 'make':
+            return 'Raspberry Pi'
+        elif arg == 'model':
+            return reading[reading.rfind(system_board['make']) + len(system_board['make']):].strip()
+    # Otherwise look in standard Linux path
+    if arg == 'make' and (reading := quick_cat(f'{hardware_path_other}/board_vendor')) is not None:
+        return reading
+    elif arg == 'model' and (reading := quick_cat(f'{hardware_path_other}/board_name')) is not None:
+        return reading
+    else:
+        return None
 
 
 def set_default_timezone(timezone) -> None:
     global _default_timezone
     _default_timezone = timezone
 
-def as_local(dattim: dt) -> dt:
-    global _default_timezone
+def as_local(input_dt: dt) -> dt:
     """Convert a UTC datetime object to local time zone."""
-    if dattim.tzinfo == _default_timezone:
-        return dattim
-    if dattim.tzinfo is None:
-        dattim = _utc.localize(dattim)
+    if input_dt.tzinfo is None:
+        input_dt = _utc.localize(input_dt)
+    if input_dt.tzinfo == _default_timezone:
+        return input_dt
+    return input_dt.astimezone(_default_timezone)
 
-    return dattim.astimezone(_default_timezone)
-
-def utc_from_timestamp(timestamp: float) -> dt:
+def utc_from_ts(timestamp: float) -> dt:
     """Return a UTC time from a timestamp."""
     return _utc.localize(dt.utcfromtimestamp(timestamp))
 
 def get_last_boot() -> str:
-    return str(as_local(utc_from_timestamp(psutil.boot_time())).isoformat())
+    return str(as_local(utc_from_ts(psutil.boot_time())).isoformat())
 
 def get_last_message() -> str:
-    return str(as_local(utc_from_timestamp(time.time())).isoformat())
+    return str(as_local(utc_from_ts(time.time())).isoformat())
 
 def get_updates() -> int:
+    """Return the number of pending OS updates"""
     cache = apt.Cache()
     cache.open(None)
     cache.upgrade()
     return cache.get_changes().__len__()
 
-# Temperature method depending on system distro
+
 def get_temp() -> float:
-    temp = 'Unknown'
-    # Utilising psutil for temp reading on ARM arch
-    try:
+    """Return CPU temperature"""
+    temp = 0
+    try: # ARM architecture check
         temp = psutil.sensors_temperatures()['cpu_thermal'][0].current
     except:
-        try:
-            # Assumes that first entry is the CPU package
+        try: # Try the first entry of coretemp
             temp = psutil.sensors_temperatures()['coretemp'][0].current
         except:
-            try:
-                # Otherwise, attempts k10temp (for some AMD chips) and averages their values
-                temp = 0
+            try: # For some AMD chips (and average values)
                 output = psutil.sensors_temperatures()['k10temp']
                 for t in output:
                     temp += t.current
@@ -134,16 +129,20 @@ def get_load(arg) -> float:
     return psutil.getloadavg()[arg]
 
 def get_net_data(arg) -> float:
-    global _previous_net_data
-    global _previous_time
-    current_net_data = psutil.net_io_counters()
-    current_time = time.time()
-    if current_time == _previous_time:
-        current_time += 1
-    net_data = (current_net_data[0] - _previous_net_data[0]) / (current_time - _previous_time) * 8 / 1024
-    net_data = (net_data, (current_net_data[1] - _previous_net_data[1]) / (current_time - _previous_time) * 8 / 1024)
-    _previous_time = current_time
-    _previous_net_data = current_net_data
+    # Define globals to update
+    global tx_previous
+    global time_previous
+    # Get the current network stats
+    net_data_current = psutil.net_io_counters()
+    time_current = time.time()
+    # What's this for                                                                               ??????
+    if time_current == time_previous:
+        time_current += 1
+    # Convert
+    net_data = (net_data_current[0] - tx_previous[0]) / (time_current - time_previous) * 8 / 1024
+    net_data = (net_data, (net_data_current[1] - tx_previous[1]) / (time_current - time_previous) * 8 / 1024)
+    time_previous = time_current
+    tx_previous = net_data_current
     net_data = ['%.2f' % net_data[0], '%.2f' % net_data[1]]
     return net_data[arg]
 
@@ -176,7 +175,7 @@ def get_wifi_ssid() -> str:
                                   ]
                               ).decode('utf-8').rstrip()
     except Exception as e:
-        c_print(f'Could not deterine WiFi SSID: {text_color.B_FAIL}{e}', tab=1, status='warning')
+        c_print(f'Could not determine WiFi SSID: {text_color.B_FAIL}{e}', tab=1, status='warning')
     return ssid
 
 def get_rpi_power_status() -> str:
@@ -218,18 +217,18 @@ def external_drive_base(drive, drive_path) -> dict:
         'sensor_type': 'sensor',
         'function': lambda: get_disk_usage(f'{drive_path}')
         }
-#command_find('lscpu', 'Model name:')
+
 sensor_objects = {
           'board_make':
                 {'name': 'System Make',
                  'icon': 'domain',
                  'sensor_type': 'sensor',
-                 'function': get_make},
+                 'function': lambda: get_board_info("make")},
           'board_model':
                 {'name': 'System Model',
                  'icon': 'package',
                  'sensor_type': 'sensor',
-                 'function': get_model},
+                 'function': lambda: get_board_info("model")},
           'temperature': 
                 {'name':'Temperature',
                  'class': 'temperature',
@@ -237,11 +236,6 @@ sensor_objects = {
                  'icon': 'thermometer',
                  'sensor_type': 'sensor',
                  'function': get_temp},
-          'cpu_make': 
-                {'name':'CPU Make',
-                 'icon': 'domain',
-                 'sensor_type': 'sensor',
-                 'function': lambda: command_find("lscpu", "Vendor ID:")},
           'cpu_model': 
                 {'name':'CPU Model',
                  'icon': 'package',
