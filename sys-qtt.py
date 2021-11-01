@@ -68,6 +68,8 @@ def update_sensors():
 
 def send_config_message(mqttClient):
     c_print('Publishing sensor configurations...', tab=1, status='wait')
+    make = get_board_info('board_vendor')
+    model = get_board_info('board_name')
     payload_size = 0
     for sensor, attr in sensor_objects.items():
         try:
@@ -83,7 +85,7 @@ def send_config_message(mqttClient):
                             + f'"unique_id":"{device_name}_sensor_{sensor}",'
                             + f'"availability_topic":"sys-qtt/sensor/{device_name}/availability",'
                             + f'"device":{{"identifiers":["{device_name}_sensor"],'
-                            + f'"name":"{deviceNameDisplay} Sensors","model":"{system_board["model"]}", "manufacturer":"{system_board["make"]}"}}'
+                            + f'"name":"{deviceNameDisplay}","manufacturer":"{make}","model":"{model}"}}'
                             + (f',"icon":"mdi:{attr["icon"]}"' if 'icon' in attr else '')
                             + f'}}'
                             ),
@@ -259,7 +261,7 @@ def on_message(client, userdata, message):
 if __name__ == '__main__':
     try:
         print()
-        c_print(f'{text_color.B_NOTICE}System Sensors starting...')
+        c_print(f'{text_color.B_NOTICE}Sys-QTT starting...')
         print()
         # Find settings.yaml
         try:

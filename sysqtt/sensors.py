@@ -9,7 +9,6 @@ rpi_power_disabled = True
 under_voltage = None
 apt_disabled = True
 
-system_board = {'make':'Unknown','model':'Unknown'}
 hardware_path_other = '/sys/devices/virtual/dmi/id/'
 hardware_path_raspi = '/sys/firmware/devicetree/base/model'
 
@@ -19,6 +18,7 @@ time_previous = time.time() - 10 # Why minus 10?
 _default_timezone = None
 _utc = pytz.utc
 
+RASP_NAME_CONST = 'Raspberry Pi'
 
 # Test for apt module for reporting update metric
 try:
@@ -47,18 +47,16 @@ with open('/etc/os-release') as f:
 def get_board_info(arg) -> str:
     """Return details about the host's motherboard. 'make' and 'model' are supprted arguments"""
     # Raspberry Pi path first
-    if (reading := quick_cat(hardware_path_raspi)) is not None and 'Raspberry Pi' in reading:
+    if (reading := quick_cat(hardware_path_raspi)) is not None and (rasp_find := reading.rfind(RASP_NAME_CONST)) > 0:
         if arg == 'make':
             return 'Raspberry Pi'
         elif arg == 'model':
-            return reading[reading.rfind(system_board['make']) + len(system_board['make']):].strip()
+            return reading[reading[rasp_find + len(RASP_NAME_CONST)]:].strip()
     # Otherwise look in standard Linux path
-    if arg == 'make' and (reading := quick_cat(f'{hardware_path_other}/board_vendor')) is not None:
-        return reading
-    elif arg == 'model' and (reading := quick_cat(f'{hardware_path_other}/board_name')) is not None:
+    if (reading := quick_cat(f'{hardware_path_other}/{arg}')) is not None:
         return reading
     else:
-        return None
+        return 'Unknown'
 
 
 def set_default_timezone(timezone) -> None:
@@ -220,15 +218,15 @@ def external_drive_base(drive, drive_path) -> dict:
 
 sensor_objects = {
           'board_make':
-                {'name': 'System Make',
+                {'name': 'Make',
                  'icon': 'domain',
                  'sensor_type': 'sensor',
-                 'function': lambda: get_board_info("make")},
+                 'function': lambda: get_board_info("board_vendor")},
           'board_model':
-                {'name': 'System Model',
+                {'name': 'Model',
                  'icon': 'package',
                  'sensor_type': 'sensor',
-                 'function': lambda: get_board_info("model")},
+                 'function': lambda: get_board_info("board_name")},
           'temperature': 
                 {'name':'Temperature',
                  'class': 'temperature',
@@ -245,24 +243,24 @@ sensor_objects = {
                 {'name':'CPU Threads',
                  'icon': 'cpu-64-bit',
                  'sensor_type': 'sensor',
-                 'function': lambda: command_find("lscpu", "CPU(s):")},
+                 'function': lambda: command_find("lscpu", "CPU(s):", ret_type=int)},
           'cpu_cores': 
                 {'name':'CPU Cores',
                  'icon': 'cpu-64-bit',
                  'sensor_type': 'sensor',
-                 'function': lambda: command_find("lscpu", "Core(s) per socket:")},
+                 'function': lambda: command_find("lscpu", "Core(s) per socket:", ret_type=int)},
           'cpu_max_speed': 
                 {'name':'CPU Max',
                  'unit': 'MHz',
                  'icon': 'cpu-64-bit',
                  'sensor_type': 'sensor',
-                 'function': lambda: command_find("lscpu", "CPU max MHz:")},
+                 'function': lambda: command_find("lscpu", "CPU max MHz:", ret_type=int)},
           'cpu_speed':
                 {'name':'CPU Speed',
                  'unit': 'MHz',
                  'icon': 'cpu-64-bit',
                  'sensor_type': 'sensor',
-                 'function': lambda: command_find("lscpu", "CPU MHz:")},
+                 'function': lambda: command_find("lscpu", "CPU MHz:", ret_type=int)},
           'cpu_usage':
                 {'name':'CPU Usage',
                  'unit': '%',
@@ -307,7 +305,7 @@ sensor_objects = {
                  'sensor_type': 'sensor',
                  'function': get_host_ip},
           'os':
-                {'name': 'System OS',
+                {'name': 'OS',
                  'icon': 'linux',
                  'sensor_type': 'sensor',
                  'function': get_host_os},
@@ -315,7 +313,7 @@ sensor_objects = {
                 {'name': 'Architecture',
                  'icon': 'chip',
                  'sensor_type': 'sensor',
-                 'function': get_host_arch},
+                 'function': lambda: command_find("lscpu", "Architecture:")},
           'updates': 
                 {'name':'Updates',
                  'icon': 'package-down',
