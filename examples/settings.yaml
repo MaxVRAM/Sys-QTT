@@ -9,28 +9,29 @@ client_id: example_client   # Client ID/name of this device for the MQTT broker 
 timezone: Europe/Brussels   # The system's local timezone (required)
 update_interval: 60         # Seconds between updating sensor values and publishing to broker (default 60)
 sensors:
+  hardware_make: true
+  hardware_model: true
   temperature: true
   clock_speed: true
-  disk_use: true
-  memory_use: true
+  cpu_model: false
   cpu_usage: true
   load_1m: true
   load_5m: true
   load_15m: true
-  net_tx: true
-  net_rx: true
+  memory_use: true
   swap_usage: true
-  power_status: true
-  last_boot: true
   hostname: true
   host_ip: true
   host_os: true
   host_arch: true
-  hardware_make: true
-  hardware_model: true
-  last_message: true
   updates: true
   wifi_strength: true
   wifi_ssid: true
+  net_tx: true
+  net_rx: true
+  last_boot: true
+  last_message: true
+  power_status: true
+  disk_use: true
   external_drives: # Only add mounted drives here, e.g.:
     # Drive1: /media/storage

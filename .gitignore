@@ -1,5 +1,4 @@
-.vscode
-*.code-workspace
+
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -106,7 +105,8 @@ venv.bak/
 # mkdocs documentation
 /site
 
-# mypy
+# Custom stuff
 .mypy_cache/
-/src/settings.yaml
-system_sensors.service
+/settings.yaml
+.vscode
+*.code-workspace

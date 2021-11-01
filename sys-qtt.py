@@ -3,7 +3,7 @@
 import sys, time, yaml, signal, pathlib, argparse, schedule
 import paho.mqtt.client as mqtt
 from os import path
-from sensors import * 
+from sysqtt.sensors import * 
 
 
 poll_interval = 60
@@ -53,7 +53,7 @@ def update_sensors():
         f'update{"s" if failed_size > 1 else ""} unable to be sent.', tab=1, status='fail')
     try:
         mqtt_client.publish(
-            topic=f'system-sensors/{attr["sensor_type"]}/{device_name}/state',
+            topic=f'sys-qtt/{attr["sensor_type"]}/{device_name}/state',
             payload=payload_str,
             qos=1,
             retain=False,)
@@ -77,13 +77,13 @@ def send_config_message(mqttClient):
                     payload = (f'{{'
                             + (f'"device_class":"{attr["class"]}",' if 'class' in attr else '')
                             + f'"name":"{deviceNameDisplay} {attr["name"]}",'
-                            + f'"state_topic":"system-sensors/sensor/{device_name}/state",'
+                            + f'"state_topic":"sys-qtt/sensor/{device_name}/state",'
                             + (f'"unit_of_measurement":"{attr["unit"]}",' if 'unit' in attr else '')
                             + f'"value_template":"{{{{value_json.{sensor}}}}}",'
                             + f'"unique_id":"{device_name}_sensor_{sensor}",'
-                            + f'"availability_topic":"system-sensors/sensor/{device_name}/availability",'
+                            + f'"availability_topic":"sys-qtt/sensor/{device_name}/availability",'
                             + f'"device":{{"identifiers":["{device_name}_sensor"],'
-                            + f'"name":"{deviceNameDisplay} Sensors","model":"RPI {deviceNameDisplay}", "manufacturer":"RPI"}}'
+                            + f'"name":"{deviceNameDisplay} Sensors","model":"{system_board["model"]}", "manufacturer":"{system_board["make"]}"}}'
                             + (f',"icon":"mdi:{attr["icon"]}"' if 'icon' in attr else '')
                             + f'}}'
                             ),
@@ -91,12 +91,12 @@ def send_config_message(mqttClient):
                     retain=True,
                 )
                 payload_size += 1
-                c_print(f'{text_color.B_HLIGHT}{sensor}', tab=2, status='ok')
+                c_print(f'{sensor}: {text_color.B_HLIGHT}{attr["function"]()}', tab=2, status='ok')
         except Exception as e:
             c_print(f'Could not process {text_color.B_HLIGHT}{sensor}{text_color.RESET} sensor configuration: {text_color.B_HLIGHT}{e}', tab=2, status='warning')
         except ProgramKilled:
             pass
-    mqttClient.publish(f'system-sensors/sensor/{device_name}/availability', 'online', retain=True)
+    mqttClient.publish(f'sys-qtt/sensor/{device_name}/availability', 'online', retain=True)
     c_print(f'{text_color.B_HLIGHT}{payload_size}{text_color.RESET} sensor config{"s" if payload_size > 1 else ""} sent to MQTT broker.', tab=1, status='ok')
 
 def _parser():
@@ -224,7 +224,7 @@ def on_connect(client, userdata, flags, rc):
     if rc == 0:
         try:
             client.subscribe('hass/status')
-            mqtt_client.publish(f'system-sensors/sensor/{device_name}/availability', 'online', retain=True)
+            mqtt_client.publish(f'sys-qtt/sensor/{device_name}/availability', 'online', retain=True)
             c_print(f'{text_color.B_OK}Success!', tab=1, status='ok')
             c_print(f'Updated {text_color.B_HLIGHT}{device_name}{text_color.RESET} client on broker with {text_color.B_HLIGHT}online{text_color.RESET} status.', tab=1, status='info')
             global connected
@@ -293,24 +293,31 @@ if __name__ == '__main__':
         mqtt_client.on_disconnect = on_disconnect
         mqtt_client.on_message = on_message
 
-        mqtt_client.will_set(f'system-sensors/sensor/{device_name}/availability', 'offline', retain=True)
+        # set the client's availibilty will and user
+        mqtt_client.will_set(f'sys-qtt/sensor/{device_name}/availability', 'offline', retain=True)
         if 'user' in settings_dict['mqtt']:
             mqtt_client.username_pw_set(
                 settings_dict['mqtt']['user'], settings_dict['mqtt']['password']
             )
         
+        # For gracefully exiting
         signal.signal(signal.SIGTERM, signal_handler)
         signal.signal(signal.SIGINT, signal_handler)
 
         c_print(f'{text_color.B_OK}Local configuration complete.', tab=1, status='ok')
 
+        # Initial connection to broker for pushing config
         connect_to_broker()
 
+        # Start the MQTT loop to maintain connection
         c_print('Establishing MQTT connection loop...', status='wait')
         mqtt_client.loop_start()
+
+        # Waits for connection before starting the scheduled update job
         while not connected:
             time.sleep(1)
         try:
+            # Start the update job
             c_print(f'Adding {text_color.B_HLIGHT}sensor update{text_color.RESET} job on {text_color.B_HLIGHT}{poll_interval}{text_color.RESET} second schedule...', status='wait')
             job = schedule.every(poll_interval).seconds.do(update_sensors)
             c_print(f'{text_color.B_HLIGHT}{schedule.get_jobs()}', tab=1, status='ok')
@@ -319,8 +326,10 @@ if __name__ == '__main__':
             sys.exit()
 
         print()
-        c_print(f'{text_color.B_HLIGHT}System Sensors running on {text_color.B_OK}{deviceNameDisplay}', status='ok')
+        c_print(f'{text_color.B_HLIGHT}Sys-QTT running on {text_color.B_OK}{deviceNameDisplay}', status='ok')
         print()
+
+        # Initial sensor update 
         update_sensors()
 
         while True:
@@ -333,7 +342,7 @@ if __name__ == '__main__':
                 schedule.cancel_job(job)
                 mqtt_client.loop_stop()
                 if mqtt_client.is_connected():
-                    mqtt_client.publish(f'system-sensors/sensor/{device_name}/availability', 'offline', retain=True)
+                    mqtt_client.publish(f'sys-qtt/sensor/{device_name}/availability', 'offline', retain=True)
                     mqtt_client.disconnect()
                 print()
                 c_print(f'{text_color.B_HLIGHT}Shutdown complete...')
