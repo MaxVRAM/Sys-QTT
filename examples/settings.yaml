@@ -9,11 +9,15 @@ client_id: example_client   # Client ID/name of this device for the MQTT broker 
 timezone: Europe/Brussels   # The system's local timezone (required)
 update_interval: 60         # Seconds between updating sensor values and publishing to broker (default 60)
 sensors:
-  hardware_make: true
-  hardware_model: true
+  board_make: true
+  board_model: true
   temperature: true
-  clock_speed: true
-  cpu_model: false
+  cpu_make: true
+  cpu_model: true
+  cpu_threads: true
+  cpu_cores: true
+  cpu_max_speed: true
+  cpu_speed: true
   cpu_usage: true
   load_1m: true
   load_5m: true
@@ -21,9 +25,9 @@ sensors:
   memory_use: true
   swap_usage: true
   hostname: true
-  host_ip: true
-  host_os: true
-  host_arch: true
+  ip: true
+  os: true
+  arch: true
   updates: true
   wifi_strength: true
   wifi_ssid: true
