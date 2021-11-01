@@ -50,7 +50,7 @@ sudo apt-get install python3-apt
 ```
 5. Make a copy of the example setting file and update it with your MQTT broker details, client ID and client device name:
 ```bash
-cp examples/settings_example.yaml settings.yaml && nano settings.yaml
+cp examples/settings.yaml settings.yaml && nano settings.yaml
 ```
 6. Test the script within your CLI session, any issues will be clearly logged:
 ```bash
