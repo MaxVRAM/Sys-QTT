@@ -10,7 +10,7 @@ I'll remove this notice once things are safe again.
 
 ## Metrics
 The `settings.yaml` file provides a selection from the following metrics:
-- **CPU**: model, number of cores, usage percent, temperature and current clock-speed
+- **CPU**: make, model, temperature, number of threads and cores, usage, and current & max clock-speed
 - **Average Load**: 1min, 5min and 15min
 - **Storage**: system and mounted volume drive usages
 - **Memory**: physical memory usage, swap usage
@@ -22,7 +22,8 @@ The `settings.yaml` file provides a selection from the following metrics:
 ## Roadmap
 - [x] Add board make and model sensors
 - [x] Comprehensive logging for debug
-- [ ] Clean up the project file structure
+- [x] Clean up the project file structure
+- [x] Add CPU make, model, threads, cores and max speed
 - [ ] Install and update script
 
 ## Requirements
@@ -49,21 +50,76 @@ sudo apt-get install python3-apt
 ```
 5. Make a copy of the example setting file and update it with your MQTT broker details, client ID and client device name:
 ```bash
-cp examples/settings_example.yaml settings.yaml && nano settings.yaml
+cp examples/settings.yaml settings.yaml && nano settings.yaml
 ```
 6. Test the script within your CLI session, any issues will be clearly logged:
 ```bash
 python3 sys-qtt.py --settings settings.yaml
 ```
 
+### Output Example
+
+<details><summary>Click here</summary>
+<p>
+   
+```
+System Sensors starting...
+
+[•] Importing settings...
+    [✓] Local configuration complete.
+[•] Attempting to reach MQTT broker at 192.168.20.5 on port 1883...
+    [✓] MQTT broker responded.
+    [•] Publishing sensor configurations...
+        [✓] board_make: Micro-Star International Co., Ltd.
+        [✓] board_model: MPG X570 GAMING PLUS (MS-7C37)
+        [✓] temperature: 51.8
+        [✓] cpu_make: AuthenticAMD
+        [✓] cpu_model: AMD Ryzen 5 3600X 6-Core Processor
+        [✓] cpu_threads: 12
+        [✓] cpu_cores: 6
+        [✓] cpu_max_speed: 4408.5928
+        [✓] cpu_speed: 2200.000
+        [✓] cpu_usage: 20.0
+        [✓] load_1m: 1.29
+        [✓] load_5m: 1.47
+        [✓] load_15m: 1.58
+        [✓] memory_use: 25.2
+        [✓] swap_usage: 0.0
+        [✓] hostname: maxvram-desktop
+        [✓] ip: 192.168.70.20
+        [✓] os: Ubuntu 20.04.3 LTS
+        [✓] arch: x86_64
+        [✓] updates: 0
+        [✓] net_tx: 17.62
+        [✓] net_rx: 0.00
+        [✓] last_boot: 2021-11-01T10:21:05+11:00
+        [✓] last_message: 2021-11-01T16:33:53.297987+11:00
+        [✓] disk_use: 43.3
+        [✓] disk_use_storage: 35.9
+    [✓] 26 sensor configs sent to MQTT broker.
+[•] Establishing MQTT connection loop...
+    [✓] Success!
+    [i] Updated desktop client on broker with online status.
+[•] Adding sensor update job on 30 second schedule...
+    [✓] [Every 30 seconds do update_sensors() (last run: [never], next run: 2021-11-01 16:35:47)]
+
+[✓] Sys-QTT running on Desktop
+
+[•] Sending sensor payload...
+    [✓] 26 sensor updates sent to MQTT broker.
+    [•] 30 seconds until next update...
+```
+</p>
+</details>
+
 ## Usage
 If the installation and test went well, you can now add a run service for Sys-QTT to run in the background on boot:
 
-1. Open and edit the `sys-qtt.service` file, changing the user and exec file paths to reflect your configuration:
+1. Open and edit the example `sys-qtt.service` file, changing the user and exec file paths to reflect your configuration:
 ```bash
 nano examples/sys-qtt.service
 ```
-2. Copy the service file to your system service directory:
+2. Copy the updated service file to your system service directory:
 ```bash
 sudo cp examples/sys-qtt.service /etc/systemd/system
 ```
@@ -72,7 +128,6 @@ sudo cp examples/sys-qtt.service /etc/systemd/system
 sudo systemctl enable sys-qtt
 sudo systemctl start sys-qtt
 ```
-
 4. Check that the service started correctly:
 ```bash
 sudo systemctl status sys-qtt
