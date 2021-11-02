@@ -5,8 +5,9 @@ from datetime import datetime as dt, timedelta as td
 from sysqtt.c_print import *
 from sysqtt.utils import quick_cat, command_find
 
-rpi_power_disabled = True
-under_voltage = None
+
+
+
 apt_disabled = True
 
 hardware_path_other = '/sys/devices/virtual/dmi/id/'
@@ -28,14 +29,6 @@ except ImportError:
     pass
 
 
-# Test for Raspberry PI power reporting module
-try:
-    from rpi_bad_power import new_under_voltage
-    if new_under_voltage() is not None:
-        rpi_power_disabled = False
-        under_voltage = new_under_voltage()
-except ImportError:
-    pass
 
 # Get OS information
 with open('/etc/os-release') as f:
@@ -176,9 +169,6 @@ def get_wifi_ssid() -> str:
         c_print(f'Could not determine WiFi SSID: {text_color.B_FAIL}{e}', tab=1, status='warning')
     return ssid
 
-def get_rpi_power_status() -> str:
-    return under_voltage.get()
-
 def get_hostname() -> str:
     return socket.gethostname()
 
@@ -207,36 +197,34 @@ def get_host_arch() -> str:
     except:
         return 'Unknown'
 
-def external_drive_base(drive, drive_path) -> dict:
+def external_disk_object(disk, disk_path) -> dict:
     return {
-        'name': f'Disk Use {drive}',
+        'name': f'Disk {disk}',
         'unit': '%',
         'icon': 'harddisk',
         'sensor_type': 'sensor',
-        'function': lambda: get_disk_usage(f'{drive_path}')
+        'function': lambda: get_disk_usage(f'{disk_path}')
         }
 
 sensor_objects = {
           'board_make':
-                {'name': 'Make',
+                {'name': 'M/B Make',
                  'icon': 'domain',
                  'sensor_type': 'sensor',
                  'function': lambda: get_board_info("board_vendor")},
           'board_model':
-                {'name': 'Model',
+                {'name': 'M/B Model',
                  'icon': 'package',
                  'sensor_type': 'sensor',
                  'function': lambda: get_board_info("board_name")},
-          'temperature': 
-                {'name':'Temperature',
-                 'class': 'temperature',
-                 'unit': '°C',
-                 'icon': 'thermometer',
+          'cpu_arch':
+                {'name': 'CPU Architecture',
+                 'icon': 'chip',
                  'sensor_type': 'sensor',
-                 'function': get_temp},
+                 'function': lambda: command_find("lscpu", "Architecture:")},
           'cpu_model': 
                 {'name':'CPU Model',
-                 'icon': 'package',
+                 'icon': 'cpu-64-bit',
                  'sensor_type': 'sensor',
                  'function': lambda: command_find("lscpu", "Model name:")},
           'cpu_threads': 
@@ -261,6 +249,13 @@ sensor_objects = {
                  'icon': 'cpu-64-bit',
                  'sensor_type': 'sensor',
                  'function': lambda: command_find("lscpu", "CPU MHz:", ret_type=int)},
+          'cpu_temp': 
+                {'name':'CPU Temperature',
+                 'class': 'temperature',
+                 'unit': '°C',
+                 'icon': 'thermometer',
+                 'sensor_type': 'sensor',
+                 'function': get_temp},
           'cpu_usage':
                 {'name':'CPU Usage',
                  'unit': '%',
@@ -282,68 +277,63 @@ sensor_objects = {
                  'icon': 'cpu-64-bit',
                  'sensor_type': 'sensor',
                  'function': lambda: get_load(2)},
-          'memory_use':
-                {'name':'Memory Use',
+          'memory_physical':
+                {'name':'Memory Physical',
                  'unit': '%',
                  'icon': 'memory',
                  'sensor_type': 'sensor',
                  'function': get_memory_usage},
-          'swap_usage':
-                {'name':'Swap Usage',
+          'memory_swap':
+                {'name':'Memory Swap',
                  'unit': '%',
                  'icon': 'harddisk',
                  'sensor_type': 'sensor',
                  'function': get_swap_usage},
-          'hostname':
-                {'name': 'Hostname',
+          'os_hostname':
+                {'name': 'OS Hostname',
                  'icon': 'card-account-details',
                  'sensor_type': 'sensor',
                  'function': get_hostname},
-          'ip':
-                {'name': 'IP Address',
-                 'icon': 'ip',
-                 'sensor_type': 'sensor',
-                 'function': get_host_ip},
-          'os':
-                {'name': 'OS',
+          'os_distro':
+                {'name': 'OS Distro',
                  'icon': 'linux',
                  'sensor_type': 'sensor',
                  'function': get_host_os},
-          'arch':
-                {'name': 'Architecture',
-                 'icon': 'chip',
-                 'sensor_type': 'sensor',
-                 'function': lambda: command_find("lscpu", "Architecture:")},
-          'updates': 
-                {'name':'Updates',
+          'os_updates': 
+                {'name':'OS Updates',
                  'icon': 'package-down',
                  'sensor_type': 'sensor',
                  'function': get_updates},
-          'wifi_strength': 
-                {'class': 'signal_strength',
-                 'name':'WiFi Strength',
-                 'unit': 'dBm',
-                 'icon': 'wifi-strength-3',
+          'net_ip':
+                {'name': 'Network IP',
+                 'icon': 'ip',
                  'sensor_type': 'sensor',
-                 'function': get_wifi_strength},
-          'wifi_ssid': 
-                {'class': 'signal_strength',
-                 'name':'WiFi SSID',
-                 'icon': 'wifi',
-                 'sensor_type': 'sensor',
-                 'function': get_wifi_ssid},
-          'net_tx':
-                {'name': 'Upload Throughput',
+                 'function': get_host_ip},
+          'net_up':
+                {'name': 'Network Up',
                  'unit': 'Kbps',
                  'icon': 'upload-network',
                  'sensor_type': 'sensor',
                  'function': lambda: get_net_data(0)},
-          'net_rx':
-                {'name': 'Download Throughput',
+          'net_down':
+                {'name': 'Network Down',
                  'unit': 'Kbps',
                  'icon': 'download-network',
                  'sensor_type': 'sensor',
                  'function': lambda: get_net_data(1)},
+          'net_wifi_strength': 
+                {'name':'WiFi Strength',
+                 'class': 'signal_strength',
+                 'unit': 'dBm',
+                 'icon': 'wifi-strength-3',
+                 'sensor_type': 'sensor',
+                 'function': get_wifi_strength},
+          'net_wifi_ssid': 
+                {'name':'WiFi SSID',
+                 'class': 'signal_strength',
+                 'icon': 'wifi',
+                 'sensor_type': 'sensor',
+                 'function': get_wifi_ssid},
           'last_boot':
                 {'name': 'Last Boot',
                  'class': 'timestamp',
@@ -356,14 +346,8 @@ sensor_objects = {
                  'icon': 'clock-check',
                  'sensor_type': 'sensor',
                  'function': get_last_message},
-          'power_status':
-                {'name': 'Power Status',
-                 'class': 'problem',
-                 'icon': 'power-plug',
-                 'sensor_type': 'binary_sensor',
-                 'function': get_rpi_power_status},
-          'disk_use':
-                {'name':'Disk Use',
+          'disk_filesystem':
+                {'name':'Disk Filesystem',
                  'unit': '%',
                  'icon': 'micro-sd',
                  'sensor_type': 'sensor',

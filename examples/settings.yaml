@@ -36,6 +36,6 @@ sensors:
   last_boot: true
   last_message: true
   power_status: true
-  disk_use: true
-  external_drives: # Only add mounted drives here, e.g.:
+  disk_filesystem: true
+  disk_mounted: # Only add mounted drives here, e.g.:
     # Drive1: /media/storage

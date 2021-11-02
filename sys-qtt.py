@@ -12,8 +12,8 @@ mqtt_client = None
 device_name = None
 settings_dict = {}
 sensors_dict = {}
-drives_dict = {}
-external_drives = []
+disks_dict = {}
+mounted_disks = []
 
 connected = False
 program_killed = False
@@ -39,7 +39,7 @@ def update_sensors():
             break
         try:
             # Skip sensors that have been disabled or are missing
-            if sensor in external_drives or (settings_dict['sensors'][sensor] is not None and settings_dict['sensors'][sensor] == True):
+            if sensor in mounted_disks or (settings_dict['sensors'][sensor] is not None and settings_dict['sensors'][sensor] == True):
                 payload_str += f'"{sensor}": "{attr["function"]()}",'
                 payload_size += 1
         except Exception as e:
@@ -73,7 +73,7 @@ def send_config_message(mqttClient):
     payload_size = 0
     for sensor, attr in sensor_objects.items():
         try:
-            if sensor in external_drives or settings_dict['sensors'][sensor]:
+            if sensor in mounted_disks or settings_dict['sensors'][sensor]:
                 mqttClient.publish(
                     topic=f'homeassistant/{attr["sensor_type"]}/{device_name}/{sensor}/config',
                     payload = (f'{{'
@@ -95,11 +95,13 @@ def send_config_message(mqttClient):
                 payload_size += 1
                 c_print(f'{sensor}: {text_color.B_HLIGHT}{attr["function"]()}', tab=2, status='ok')
         except Exception as e:
-            c_print(f'Could not process {text_color.B_HLIGHT}{sensor}{text_color.RESET} sensor configuration: {text_color.B_HLIGHT}{e}', tab=2, status='warning')
+            c_print(f'Could not process {text_color.B_HLIGHT}{sensor}{text_color.RESET} sensor configuration: '
+                    f'{text_color.B_HLIGHT}{e}', tab=2, status='warning')
         except ProgramKilled:
             pass
     mqttClient.publish(f'sys-qtt/sensor/{device_name}/availability', 'online', retain=True)
-    c_print(f'{text_color.B_HLIGHT}{payload_size}{text_color.RESET} sensor config{"s" if payload_size > 1 else ""} sent to MQTT broker.', tab=1, status='ok')
+    c_print(f'{text_color.B_HLIGHT}{payload_size}{text_color.RESET} sensor config{"s" if payload_size > 1 else ""} '
+            f'sent to MQTT broker.', tab=1, status='ok')
 
 def _parser():
     default_settings_path = str(pathlib.Path(__file__).parent.resolve()) + '/settings.yaml'
@@ -146,18 +148,19 @@ def set_defaults(settings):
     # Print missing sensor
     if len(missing_sensors) > 0:
         sensors_to_add = ' '.join(missing_sensors)
-        c_print(f'{text_color.B_HLIGHT}{len(missing_sensors)}{text_color.RESET} sensor(s) not defined as true/false in settings file. Added them to the session by default:', tab=1, status='warning')
+        c_print(f'{text_color.B_HLIGHT}{len(missing_sensors)}{text_color.RESET} sensor(s) not defined as true/false in settings '
+                f'file. Added them to the session by default:', tab=1, status='warning')
         c_print(f'{text_color.B_HLIGHT}{sensors_to_add}', tab=2)
         for sensor in missing_sensors:
             settings['sensors'][sensor] = True
 
-    # Validate drive entries
-    if 'external_drives' not in settings['sensors'] or settings['sensors']['external_drives'] is None:
-        settings['sensors']['external_drives'] = {}
+    # Validate mounted disk entries
+    if 'disk_mounted' not in settings['sensors'] or settings['sensors']['disk_mounted'] is None:
+        settings['sensors']['disk_mounted'] = {}
     else:
-        for drive in settings['sensors']['external_drives']:
-            if drive is None or len(drive) == 0:
-                c_print(f'{text_color.B_HLIGHT}{drive}{text_color.RESET} needs to be a valid path. Ignoring entry.', tab=2)
+        for disk in settings['sensors']['disk_mounted']:
+            if disk is None or len(disk) == 0:
+                c_print(f'{text_color.B_HLIGHT}{disk}{text_color.RESET} needs to be a valid path. Ignoring entry.', tab=2)
     return settings
 
 def check_settings(settings):
@@ -166,41 +169,42 @@ def check_settings(settings):
     mqtt_list = ['hostname', 'user', 'password']
     for s in settings_list:
         if s not in settings:
-            c_print(f'{text_color.B_HLIGHT}{s}{text_color.RESET} not defined in settings file. Please check the documentation.', tab=1, status='fail')
+            c_print(f'{text_color.B_HLIGHT}{s}{text_color.RESET} not defined in settings file. '
+                    f'Please check the documentation.', tab=1, status='fail')
             raise ProgramKilled
         elif s == 'mqtt':
             for m in mqtt_list:
                 if m not in settings['mqtt']:
-                    c_print(f'{text_color.B_HLIGHT}{m}{text_color.RESET} not defined in MQTT connection settings. Please check the documentation.', tab=1, status='fail')
+                    c_print(f'{text_color.B_HLIGHT}{m}{text_color.RESET} not defined in MQTT connection settings. '
+                            f'Please check the documentation.', tab=1, status='fail')
                     raise ProgramKilled
-
     # Warnings for missing or incompatible modules
-    if 'power_status' in settings['sensors'] and settings['sensors']['power_status'] and rpi_power_disabled:
-        c_print(f'{text_color.B_HLIGHT}power_status{text_color.RESET} sensor only valid on Raspberry Pi hosts, removing from session. Set sensor as "false" to suppress warning.', tab=1, status='warning')
-        settings['sensors']['power_status'] = False
     if 'updates' in settings['sensors'] and apt_disabled:
         c_print(f'Unable to import {text_color.B_HLIGHT}apt{text_color.RESET} module. removing from session.', tab=1, status='warning')
         settings['sensors']['updates'] = False
 
-def add_drives():
-    drives_dict = settings_dict['sensors']['external_drives']
-    if drives_dict is not None and len(drives_dict) != 0:
-        for drive in drives_dict:
-            if drive is not None and drives_dict[drive] is not None:
+def add_disks():
+    """Add additional disks entered in 'disk_mounted' config."""
+    disk_dict = settings_dict['sensors']['disk_mounted']
+    if disk_dict is not None and len(disk_dict) != 0:
+        for disk in disk_dict:
+            if disk is not None and disk_dict[disk] is not None:
                 try:
-                    usage = get_disk_usage(drives_dict[drive])
+                    usage = get_disk_usage(disk_dict[disk])
                     if usage:
-                        sensor_objects[f'disk_use_{drive.lower()}'] = external_drive_base(drive, drives_dict[drive])
-                        # Add drive to list with formatted name, for when checking sensors against settings items
-                        external_drives.append(f'disk_use_{drive.lower()}')
+                        sensor_objects[f'disk_usage_{disk.lower()}'] = external_disk_object(disk, disk_dict[disk])
+                        # Add disk to list with formatted name, for when checking sensors against settings items
+                        mounted_disks.append(f'disk_usage_{disk.lower()}')
                 except Exception as e:
-                    c_print(f'Error while attempting to get usage from drive entry {text_color.B_HLIGHT}{drive}{text_color.RESET} with path {text_color.B_HLIGHT}{drives_dict[drive]}{text_color.RESET}. Check settings file.', tab=1, status='warning')
+                    c_print(f'Error while attempting to get usage from disk entry {text_color.B_HLIGHT}{disk}{text_color.RESET} with path '
+                            f'{text_color.B_HLIGHT}{disk_dict[disk]}{text_color.RESET}. Check settings file.', tab=1, status='warning')
 
             else:
-                # Skip drives not found. Could be worth sending "not mounted" as the value if users want to track mount status.
-                c_print(f'Drive {text_color.B_HLIGHT}{drive}{text_color.RESET} is empty. Check settings file.', tab=1, status='warning')
+                # Skip disk not found. Could be worth sending "not mounted" as the value if users want to track mount status.
+                c_print(f'Disk {text_color.B_HLIGHT}{disk}{text_color.RESET} is empty. Check settings file.', tab=1, status='warning')
 
 def connect_to_broker():
+    """Initiates connection with MQTT server and """
     while True:
         try:
             c_print(f'Attempting to reach MQTT broker at {text_color.B_HLIGHT}{settings_dict["mqtt"]["hostname"]}{text_color.RESET} on port '
@@ -228,7 +232,8 @@ def on_connect(client, userdata, flags, rc):
             client.subscribe('hass/status')
             mqtt_client.publish(f'sys-qtt/sensor/{device_name}/availability', 'online', retain=True)
             c_print(f'{text_color.B_OK}Success!', tab=1, status='ok')
-            c_print(f'Updated {text_color.B_HLIGHT}{device_name}{text_color.RESET} client on broker with {text_color.B_HLIGHT}online{text_color.RESET} status.', tab=1, status='info')
+            c_print(f'Updated {text_color.B_HLIGHT}{device_name}{text_color.RESET} client on broker with {text_color.B_HLIGHT}online'
+                    f'{text_color.RESET} status.', tab=1, status='info')
             global connected
             connected = True
         except Exception as e:
@@ -282,8 +287,8 @@ if __name__ == '__main__':
         settings_dict = set_defaults(settings_dict)
         # Check for settings that will prevent the script from communicating with MQTT broker or break the script
         check_settings(settings_dict)
-        # Build list of external drives
-        add_drives()
+        # Build list of external disks
+        add_disks()
 
         device_name = settings_dict['devicename'].replace(' ', '_').lower()
         deviceNameDisplay = settings_dict['devicename']
@@ -320,7 +325,8 @@ if __name__ == '__main__':
             time.sleep(1)
         try:
             # Start the update job
-            c_print(f'Adding {text_color.B_HLIGHT}sensor update{text_color.RESET} job on {text_color.B_HLIGHT}{poll_interval}{text_color.RESET} second schedule...', status='wait')
+            c_print(f'Adding {text_color.B_HLIGHT}sensor update{text_color.RESET} job on '
+                    f'{text_color.B_HLIGHT}{poll_interval}{text_color.RESET} second schedule...', status='wait')
             job = schedule.every(poll_interval).seconds.do(update_sensors)
             c_print(f'{text_color.B_HLIGHT}{schedule.get_jobs()}', tab=1, status='ok')
         except Exception as e:

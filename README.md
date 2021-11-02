@@ -3,13 +3,14 @@
 
 Sys-QTT is a light-weight, Python-based system metrics service for monitoring networked devices. It periodically gathers a customisable selection of host machine metrics, and publishes the data to an MQTT broker/server of your choice.
 
-This was designed to use with Home Assistant, but can be used with any MQTT broker.
+Sys-QTT was designed to play nice with Home Assistant, based on their [MQTT discovery documentation](https://www.home-assistant.io/docs/mqtt/discovery/).
+It should work with other any other MQTT broker/configuration, however, keep in mind that some specifics may be related to Home Assistant.
 
 ### (Nov 2021) Warning
 
 As of November 2021, this fork of Sennevds/system_sensors is major under development.
-Some commits may create breaking changes to existing installations.
-I'll remove this notice once things are safe again.
+Some commits to `main` may create breaking changes to existing installations.
+I'll settle the project down soon and remove this warning.
 
 
 ## Metrics
@@ -30,14 +31,19 @@ The `settings.yaml` file provides a selection from the following metrics:
 - [x] Add board make and model sensors
 - [x] Comprehensive logging for debug
 - [x] Clean up the project file structure
-- [x] Add CPU make, model, threads, cores and max speed
-- [ ] Install and update script
+- [x] Add more CPU details
+- [ ] Move sensor definitions to external JSON file
+- [ ] Move semi-permanent sensor values (make, model, max, etc.) to attributes
+  - This will clean up the huge amount of sensors, especially with multiple Sys-QTT deployments
+- [ ] Install/update script
+- [ ] Web interface (yeah, I'm not a minimalist)
 
 ## Requirements
 
-(note, this has only be tested on Linux systems)
+**Platform**: This has only be tested on, and will likely only run on, Linux systems
 
 - Python **3.8+**
+- Several Python modules (installed via the supplied `requirements.txt` file)
 - An MQTT broker. For example:
   - (Home Assistant) [Mosquitto broker integration](https://github.com/home-assistant/addons/blob/master/mosquitto/DOCS.md)
   - (Docker) [Eclipse-Mosquitto](https://hub.docker.com/_/eclipse-mosquitto)

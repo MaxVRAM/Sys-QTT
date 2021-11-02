@@ -1,0 +1,95 @@
+{
+    "board_make":
+          {"name": "M/B Make",
+           "icon": "domain"},
+    "board_model":
+          {"name": "M/B Model",
+           "icon": "package"},
+    "cpu_arch":
+          {"name": "CPU Architecture",
+           "icon": "chip"},
+    "cpu_model": 
+          {"name":"CPU Model",
+           "icon": "cpu-64-bit"},
+    "cpu_threads": 
+          {"name":"CPU Threads",
+           "icon": "cpu-64-bit"},
+    "cpu_cores": 
+          {"name":"CPU Cores",
+           "icon": "cpu-64-bit"},
+    "cpu_max_speed": 
+          {"name":"CPU Max",
+           "unit": "MHz",
+           "icon": "cpu-64-bit"},
+    "cpu_speed":
+          {"name":"CPU Speed",
+           "unit": "MHz",
+           "icon": "cpu-64-bit"},
+    "cpu_temp": 
+          {"name":"CPU Temperature",
+           "class": "temperature",
+           "unit": "°C",
+           "icon": "thermometer"},
+    "cpu_usage":
+          {"name":"CPU Usage",
+           "unit": "%",
+           "icon": "cpu-64-bit"},
+    "load_1m":
+          {"name": "Load 1m",
+           "icon": "cpu-64-bit"},
+    "load_5m":
+          {"name": "Load 5m",
+           "icon": "cpu-64-bit"},
+    "load_15m":
+          {"name": "Load 15m",
+           "icon": "cpu-64-bit"},
+    "memory_physical":
+          {"name":"Memory Physical",
+           "unit": "%",
+           "icon": "memory"},
+    "memory_swap":
+          {"name":"Memory Swap",
+           "unit": "%",
+           "icon": "harddisk"},
+    "os_hostname":
+          {"name": "OS Hostname",
+           "icon": "card-account-details"},
+    "os_distro":
+          {"name": "OS Distro",
+           "icon": "linux"},
+    "os_updates": 
+          {"name":"OS Updates",
+           "icon": "package-down"},
+    "net_ip":
+          {"name": "Network IP",
+           "icon": "ip"},
+    "net_tx":
+          {"name": "Network Up",
+           "unit": "Kbps",
+           "icon": "upload-network"},
+    "net_rx":
+          {"name": "Network Down",
+           "unit": "Kbps",
+           "icon": "download-network",
+    "net_wifi_strength": 
+          {"name":"WiFi Strength",
+           "class": "signal_strength",
+           "unit": "dBm",
+           "icon": "wifi-strength-3"},
+    "net_wifi_ssid": 
+          {"name":"WiFi SSID",
+           "class": "signal_strength",
+           "icon": "wifi"},
+    "last_boot":
+          {"name": "Last Boot",
+           "class": "timestamp",
+           "icon": "clock"},
+    "last_message":
+          {"name": "Last Message",
+           "class": "timestamp",
+           "icon": "clock-check"},
+    "disk_use":
+          {"name":"Disk Use",
+           "unit": "%",
+           "icon": "micro-sd"}
+}
