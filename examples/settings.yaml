@@ -1,8 +1,8 @@
 mqtt:
-  hostname: 127.0.0.1       # MQTT broker address (required)
-  port: 1883                # MQTT broker port (defaults to 1883)
-  user: username            # Username for MQTT credentials (required)
-  password: secret          # Username for MQTT credentials (required)
+  broker_host: 127.0.0.1    # MQTT broker address (required)
+  broker_port: 1883         # MQTT broker port (defaults to 1883)
+  broker_user: username     # Username for MQTT credentials (required)
+  broker_pass: secret       # Password for MQTT credentials (required)
   connection_retry: 10      # Seconds between reconnection attempts if disconnected (default 10)
 deviceName: Example Client  # Pretty/display name sent with this MQTT topic (required)
 client_id: example_client   # Client ID/name of this device for the MQTT broker (required)
@@ -11,31 +11,29 @@ update_interval: 60         # Seconds between updating sensor values and publish
 sensors:
   board_make: true
   board_model: true
-  temperature: true
-  cpu_make: true
+  cpu_arch: true
   cpu_model: true
   cpu_threads: true
   cpu_cores: true
   cpu_max_speed: true
   cpu_speed: true
+  cpu_temp: true
   cpu_usage: true
-  load_1m: true
-  load_5m: true
-  load_15m: true
-  memory_use: true
-  swap_usage: true
-  hostname: true
-  ip: true
-  os: true
-  arch: true
-  updates: true
-  wifi_strength: true
-  wifi_ssid: true
-  net_tx: true
-  net_rx: true
+  cpu_load_1m: true
+  cpu_load_5m: true
+  cpu_load_15m: true
+  memory_physical: true
+  memory_swap: true
+  os_hostname: true
+  os_distro: true
+  os_updates: true
+  net_ip: true
+  net_wifi_strength: true
+  net_wifi_ssid: true
+  net_up: true
+  net_down: true
   last_boot: true
   last_message: true
-  power_status: true
   disk_filesystem: true
   disk_mounted: # Only add mounted drives here, e.g.:
     # Drive1: /media/storage

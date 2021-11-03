@@ -4,6 +4,7 @@ import sys, time, yaml, signal, pathlib, argparse, schedule
 import paho.mqtt.client as mqtt
 from os import path
 from sysqtt.sensors import * 
+from sysqtt.utils import set_timezone
 
 
 poll_interval = 60
@@ -78,14 +79,14 @@ def send_config_message(mqttClient):
                     topic=f'homeassistant/{attr["sensor_type"]}/{device_name}/{sensor}/config',
                     payload = (f'{{'
                             + (f'"device_class":"{attr["class"]}",' if 'class' in attr else '')
-                            + f'"name":"{deviceNameDisplay} {attr["name"]}",'
+                            + f'"name":"{display_name} {attr["name"]}",'
                             + f'"state_topic":"sys-qtt/sensor/{device_name}/state",'
                             + (f'"unit_of_measurement":"{attr["unit"]}",' if 'unit' in attr else '')
                             + f'"value_template":"{{{{value_json.{sensor}}}}}",'
                             + f'"unique_id":"{device_name}_sensor_{sensor}",'
                             + f'"availability_topic":"sys-qtt/sensor/{device_name}/availability",'
                             + f'"device":{{"identifiers":["{device_name}_sensor"],'
-                            + f'"name":"{deviceNameDisplay}","manufacturer":"{make}","model":"{model}"}}'
+                            + f'"name":"{display_name}","manufacturer":"{make}","model":"{model}"}}'
                             + (f',"icon":"mdi:{attr["icon"]}"' if 'icon' in attr else '')
                             + f'}}'
                             ),
@@ -112,7 +113,8 @@ def _parser():
 
 def set_defaults(settings):
     missing_sensors = []
-    set_default_timezone(pytz.timezone(settings['timezone']))
+
+    set_timezone(settings['timezone'])
     
     # Missing non-essential settings
     global poll_interval
@@ -291,7 +293,7 @@ if __name__ == '__main__':
         add_disks()
 
         device_name = settings_dict['devicename'].replace(' ', '_').lower()
-        deviceNameDisplay = settings_dict['devicename']
+        display_name = settings_dict['devicename']
 
         mqtt_client = mqtt.Client(client_id=settings_dict['client_id'])
 
@@ -334,7 +336,7 @@ if __name__ == '__main__':
             sys.exit()
 
         print()
-        c_print(f'{text_color.B_HLIGHT}Sys-QTT running on {text_color.B_OK}{deviceNameDisplay}', status='ok')
+        c_print(f'{text_color.B_HLIGHT}Sys-QTT running on {text_color.B_OK}{display_name}', status='ok')
         print()
 
         # Initial sensor update 

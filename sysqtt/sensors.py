@@ -3,23 +3,17 @@
 import time, pytz, psutil, socket, platform, subprocess
 from datetime import datetime as dt, timedelta as td
 from sysqtt.c_print import *
-from sysqtt.utils import quick_cat, command_find
-
-
-
+from sysqtt.sensor_object import SensorObject
+from sysqtt.utils import quick_cat, quick_command, as_local, utc_from_ts
 
 apt_disabled = True
 
-hardware_path_other = '/sys/devices/virtual/dmi/id/'
-hardware_path_raspi = '/sys/firmware/devicetree/base/model'
 
-_os_data = {}
 tx_previous = psutil.net_io_counters()
 time_previous = time.time() - 10 # Why minus 10?
 _default_timezone = None
-_utc = pytz.utc
+UTC = pytz.utc
 
-RASP_NAME_CONST = 'Raspberry Pi'
 
 # Test for apt module for reporting update metric
 try:
@@ -30,49 +24,24 @@ except ImportError:
 
 
 
-# Get OS information
-with open('/etc/os-release') as f:
-    for line in f.readlines():
-        row = line.strip().split("=")
-        _os_data[row[0]] = row[1].strip('"')
-
-
 def get_board_info(arg) -> str:
+    _RASP_NAME_CONST = 'Raspberry Pi'
+    _PATH_OTHER = '/sys/devices/virtual/dmi/id/'
+    _PATH_RPI = '/sys/firmware/devicetree/base/model'
     """Return details about the host's motherboard. 'make' and 'model' are supprted arguments"""
     # Raspberry Pi path first
-    if (reading := quick_cat(hardware_path_raspi)) is not None and (rasp_find := reading.rfind(RASP_NAME_CONST)) > 0:
+    if (reading := quick_cat(_PATH_RPI)) is not None and (rasp_find := reading.rfind(_RASP_NAME_CONST)) > 0:
         if arg == 'make':
-            return 'Raspberry Pi'
+            return _RASP_NAME_CONST
         elif arg == 'model':
-            return reading[reading[rasp_find + len(RASP_NAME_CONST)]:].strip()
+            return reading[reading[rasp_find + len(_RASP_NAME_CONST)]:].strip()
     # Otherwise look in standard Linux path
-    if (reading := quick_cat(f'{hardware_path_other}/{arg}')) is not None:
+    if (reading := quick_cat(f'{_PATH_OTHER}/{arg}')) is not None:
         return reading
     else:
         return 'Unknown'
 
 
-def set_default_timezone(timezone) -> None:
-    global _default_timezone
-    _default_timezone = timezone
-
-def as_local(input_dt: dt) -> dt:
-    """Convert a UTC datetime object to local time zone."""
-    if input_dt.tzinfo is None:
-        input_dt = _utc.localize(input_dt)
-    if input_dt.tzinfo == _default_timezone:
-        return input_dt
-    return input_dt.astimezone(_default_timezone)
-
-def utc_from_ts(timestamp: float) -> dt:
-    """Return a UTC time from a timestamp."""
-    return _utc.localize(dt.utcfromtimestamp(timestamp))
-
-def get_last_boot() -> str:
-    return str(as_local(utc_from_ts(psutil.boot_time())).isoformat())
-
-def get_last_message() -> str:
-    return str(as_local(utc_from_ts(time.time())).isoformat())
 
 def get_updates() -> int:
     """Return the number of pending OS updates"""
@@ -101,9 +70,6 @@ def get_temp() -> float:
                 raise
     return round(temp, 1)
 
-def get_clock_speed() -> int:
-    clock_speed = int(psutil.cpu_freq().current)
-    return clock_speed
 
 def get_disk_usage(path) -> float:
     try:
@@ -137,12 +103,6 @@ def get_net_data(arg) -> float:
     net_data = ['%.2f' % net_data[0], '%.2f' % net_data[1]]
     return net_data[arg]
 
-def get_cpu_usage() -> float:
-    return psutil.cpu_percent(interval=None)
-
-def get_swap_usage() -> float:
-    return psutil.swap_memory().percent
-
 def get_wifi_strength() -> int:
     wifi_strength_value = subprocess.check_output(
                               [
@@ -169,8 +129,6 @@ def get_wifi_ssid() -> str:
         c_print(f'Could not determine WiFi SSID: {text_color.B_FAIL}{e}', tab=1, status='warning')
     return ssid
 
-def get_hostname() -> str:
-    return socket.gethostname()
 
 def get_host_ip() -> str:
     try:
@@ -185,11 +143,6 @@ def get_host_ip() -> str:
     finally:
         sock.close()
 
-def get_host_os() -> str:
-    try:
-        return _os_data['PRETTY_NAME']
-    except:
-        return 'Unknown'
 
 def get_host_arch() -> str:
     try:
@@ -202,13 +155,67 @@ def external_disk_object(disk, disk_path) -> dict:
         'name': f'Disk {disk}',
         'unit': '%',
         'icon': 'harddisk',
-        'sensor_type': 'sensor',
         'function': lambda: get_disk_usage(f'{disk_path}')
         }
 
+STATIC_SENSORS = {}
+
+class SensorValues(object):
+
+    static_sensors = {}
+
+    sensor_functions = {
+        'board_manufacturer': lambda: get_board_info('board_vendor'),
+        'board_model': lambda: get_board_info('board_name'),
+        'cpu_arch': lambda: quick_command('lscpu', term='Architecture:'),
+        'cpu_model': lambda: quick_command('lscpu', term='Model name:'),
+        'cpu_threads': lambda: quick_command('lscpu', term='CPU(s):', ret_type=int),
+        'cpu_cores': lambda: quick_command('lscpu', term='Core(s) per socket:', ret_type=int),
+        'cpu_max_speed': lambda: quick_command('lscpu', term='CPU max MHz:', ret_type=int),
+        'os_distro': lambda: quick_cat('/etc/os-release', term='PRETTY_NAME=').strip('"'),
+        'last_boot': lambda: str(as_local(utc_from_ts(psutil.boot_time())).isoformat()),
+        'cpu_speed': lambda: quick_command("lscpu", "CPU MHz:", ret_type=int),
+        'cpu_temp': lambda: get_temp(),
+        'cpu_usage': lambda: float(psutil.cpu_percent(interval=None)),
+        'cpu_load_1m': lambda: psutil.getloadavg()[0],
+        'cpu_load_5m': lambda: psutil.getloadavg()[1],
+        'cpu_load_15m': lambda: psutil.getloadavg()[2],
+        'memory_physical': lambda: psutil.virtual_memory().percent,
+        'memory_swap': lambda: psutil.swap_memory().percent,
+        'os_hostname': lambda: socket.gethostname(),
+        'os_updates': lambda: get_updates(),
+        'net_ip': lambda: get_host_ip(),
+        'net_wifi_strength': lambda: ' '.join(quick_cat('/proc/net/wireless', term='wlan0:').split(' ')).split()[2],
+        'net_wifi_ssid': lambda: quick_command('/usr/sbin/iwgetid', args=['-r']),
+        'net_up': lambda: get_net_data(0),
+        'net_down': lambda: get_net_data(1),
+        'last_message': lambda: str(as_local(utc_from_ts(time.time())).isoformat()),
+        'disk_filesystem': lambda: psutil.disk_usage('/').percent
+    }
+
+    def value(sensor: object):
+        try:
+            if 
+        except Exception as e:
+            c_print(f'Could not get value for {text_color.B_HLIGHT}{sensor}{text_color.RESET}: {text_color.B_FAIL}{e}', tab=1, status='error')
+
+
+    def __init__(active_sensor_objects: list) -> None:
+        """Initialise the sensor values for all the sensors in the supplied active_sensor_object list"""
+        for s in active_sensor_objects:
+            try:
+                if s.details.static == True:
+                    if s.name in SensorValues.sensor_functions:
+                        SensorObject.values[s.name] = SensorValues.static_sensors[s.name]
+                    elif s.details.mounted_disk:
+                        psutil.disk_usage().percent
+
+
+
+
 sensor_objects = {
-          'board_make':
-                {'name': 'M/B Make',
+          'board_manufacturer':
+                {'name': 'M/B Manufacturer',
                  'icon': 'domain',
                  'sensor_type': 'sensor',
                  'function': lambda: get_board_info("board_vendor")},
@@ -221,34 +228,34 @@ sensor_objects = {
                 {'name': 'CPU Architecture',
                  'icon': 'chip',
                  'sensor_type': 'sensor',
-                 'function': lambda: command_find("lscpu", "Architecture:")},
+                 'function': lambda: quick_command("lscpu", "Architecture:")},
           'cpu_model': 
                 {'name':'CPU Model',
                  'icon': 'cpu-64-bit',
                  'sensor_type': 'sensor',
-                 'function': lambda: command_find("lscpu", "Model name:")},
+                 'function': lambda: quick_command("lscpu", "Model name:")},
           'cpu_threads': 
                 {'name':'CPU Threads',
                  'icon': 'cpu-64-bit',
                  'sensor_type': 'sensor',
-                 'function': lambda: command_find("lscpu", "CPU(s):", ret_type=int)},
+                 'function': lambda: quick_command("lscpu", "CPU(s):", ret_type=int)},
           'cpu_cores': 
                 {'name':'CPU Cores',
                  'icon': 'cpu-64-bit',
                  'sensor_type': 'sensor',
-                 'function': lambda: command_find("lscpu", "Core(s) per socket:", ret_type=int)},
+                 'function': lambda: quick_command("lscpu", "Core(s) per socket:", ret_type=int)},
           'cpu_max_speed': 
                 {'name':'CPU Max',
                  'unit': 'MHz',
                  'icon': 'cpu-64-bit',
                  'sensor_type': 'sensor',
-                 'function': lambda: command_find("lscpu", "CPU max MHz:", ret_type=int)},
+                 'function': lambda: quick_command("lscpu", "CPU max MHz:", ret_type=int)},
           'cpu_speed':
                 {'name':'CPU Speed',
                  'unit': 'MHz',
                  'icon': 'cpu-64-bit',
                  'sensor_type': 'sensor',
-                 'function': lambda: command_find("lscpu", "CPU MHz:", ret_type=int)},
+                 'function': lambda: quick_command("lscpu", "CPU MHz:", ret_type=int)},
           'cpu_temp': 
                 {'name':'CPU Temperature',
                  'class': 'temperature',
@@ -262,17 +269,17 @@ sensor_objects = {
                  'icon': 'cpu-64-bit',
                  'sensor_type': 'sensor',
                  'function': get_cpu_usage},
-          'load_1m':
+          'cpu_load_1m':
                 {'name': 'Load 1m',
                  'icon': 'cpu-64-bit',
                  'sensor_type': 'sensor',
                  'function': lambda: get_load(0)},
-          'load_5m':
+          'cpu_load_5m':
                 {'name': 'Load 5m',
                  'icon': 'cpu-64-bit',
                  'sensor_type': 'sensor',
                  'function': lambda: get_load(1)},
-          'load_15m':
+          'cpu_load_15m':
                 {'name': 'Load 15m',
                  'icon': 'cpu-64-bit',
                  'sensor_type': 'sensor',
