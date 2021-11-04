@@ -73,11 +73,11 @@ def get_temp() -> float:
     temp = 0
     ps_temp = psutil.sensors_temperatures()
     if 'cpu_thermal' in ps_temp:
-        temp = ps_temp['cpu_thermal'].current
+        temp = ps_temp['cpu_thermal'][0].current
     elif 'coretemp' in ps_temp:
-        temp = ps_temp['coretemp'].current
-    else:
-        temp += [t.current for t in ps_temp['k10temp']][0]
+        temp = ps_temp['coretemp'][0].current
+    elif 'k10temp' in ps_temp:
+        temp = ps_temp['k10temp'][0].current
     return round(temp, 1)
 
 class SensorValues(object):

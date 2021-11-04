@@ -336,7 +336,10 @@ if __name__ == '__main__':
         JOB = create_scheduled_job()
 
         print()
-        c_print(f'{text_color.B_HLIGHT}Sys-QTT running on {text_color.B_OK}{SensorObject.display_name}', status='ok')
+        string_end = ''.join(['-' for _ in range(len(SensorObject.display_name))])
+        c_print('-------------------' + string_end, tab=1)
+        c_print(f'{text_color.B_HLIGHT}Sys-QTT {text_color.RESET}running on {text_color.B_OK}{SensorObject.display_name}', tab=1)
+        c_print('-------------------' + string_end, tab=1)
         print()
 
         time.sleep(1)
