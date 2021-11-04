@@ -151,20 +151,21 @@ def import_sensors(sensor_dict: dict) -> dict:
                     c_print(f'Unable add {text_color.B_HLIGHT}{s}{text_color.RESET} and has been removed '
                             f'from this session: {text_color.B_FAIL}{e}', tab=1, status='fail')
         else: # This isn't the neatest way, it'll do for now
-            drives = SETTINGS['sensors'][s]
-            for d in drives:
-                drive_details = SENSOR_DETAILS[s]
-                if d in sensor_dict:
-                    c_print(f'Multiple {text_color.B_HLIGHT}{d}{text_color.RESET} in settings.yaml {text_color.B_HLIGHT}'
-                            f'{SENSOR_JSON}{text_color.RESET}. Ignoring duplicate. Remove from config to stop this message.', tab=1, status='warning')
-                    continue
-                else:
-                    try:
-                        drive_details['name'] = f'disk_{d.replace(" ","_").lower()}'
-                        sensor_dict[drive_details['name']] = SensorObject(drive_details, path=SETTINGS['sensors'][s][d])
-                    except Exception as e:
-                        c_print(f'Unable add {text_color.B_HLIGHT}{d}{text_color.RESET} and has been removed '
-                                f'from this session: {text_color.B_FAIL}{e}', tab=1, status='fail')
+            if SETTINGS['sensors'][s] is not None:
+                drives = SETTINGS['sensors'][s]
+                for d in drives:
+                    drive_details = SENSOR_DETAILS[s]
+                    if d in sensor_dict:
+                        c_print(f'Multiple {text_color.B_HLIGHT}{d}{text_color.RESET} in settings.yaml {text_color.B_HLIGHT}'
+                                f'{SENSOR_JSON}{text_color.RESET}. Ignoring duplicate. Remove from config to stop this message.', tab=1, status='warning')
+                        continue
+                    else:
+                        try:
+                            drive_details['name'] = f'disk_{d.replace(" ","_").lower()}'
+                            sensor_dict[drive_details['name']] = SensorObject(drive_details, path=SETTINGS['sensors'][s][d])
+                        except Exception as e:
+                            c_print(f'Unable add {text_color.B_HLIGHT}{d}{text_color.RESET} and has been removed '
+                                    f'from this session: {text_color.B_FAIL}{e}', tab=1, status='fail')
 
     c_print(f'Imported {text_color.B_HLIGHT}{len(sensor_dict)}{text_color.RESET} sensor details.', tab=1, status='ok')
     # Initialise static sensors and remove ones that fail to generate a value
