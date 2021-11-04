@@ -67,7 +67,7 @@
         "icon": "harddisk"
       },
       "os_hostname": {
-        "title": "OS Hosttitle",
+        "title": "OS Hostname",
         "icon": "card-account-details"
       },
       "os_distro": {

@@ -3,9 +3,9 @@ Description=Sys-QTT
 After=multi-user.target
 
 [Service]
-User=pi
+User=chris
 Type=idle
-ExecStart=/usr/bin/python3 /home/pi/Sys-QTT/sys-qtt.py --settings /home/pi/Sys-QTT/settings.yaml
+ExecStart=/usr/bin/python3 /home/chris/Sys-QTT/sys-qtt.py --settings /home/chris/Sys-QTT/settings.yaml
 
 [Install]
 WantedBy=multi-user.target

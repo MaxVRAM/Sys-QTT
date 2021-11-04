@@ -17,7 +17,7 @@ class Tx(object):
         return round(self.values['diff'] * TX_FACTOR, 2)
 
 tx_up = Tx(0)
-tx_down = Tx(0)
+tx_down = Tx(1)
 
 tx_up.update()
 
@@ -51,10 +51,10 @@ def get_board_info(arg) -> str:
     _PATH_OTHER = '/sys/devices/virtual/dmi/id/'
     # Raspberry Pi path first
     if (reading := quick_cat(_PATH_RPI)) is not None and (rasp_find := reading.rfind(_RASP_NAME_CONST)) > 0:
-        if arg == 'make':
+        if arg == 'board_vendor':
             return _RASP_NAME_CONST
-        elif arg == 'model':
-            return reading[reading[rasp_find + len(_RASP_NAME_CONST)]:].strip()
+        elif arg == 'board_name':
+            return quick_cat(_PATH_RPI, term=_RASP_NAME_CONST) # reading[reading[rasp_find + len(_RASP_NAME_CONST)]:].strip()
     # Otherwise look in standard Linux path
     if (reading := quick_cat(f'{_PATH_OTHER}/{arg}')) is not None:
         return reading
