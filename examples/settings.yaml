@@ -1,15 +1,14 @@
-mqtt:
-  broker_host: 127.0.0.1    # MQTT broker address (required)
-  broker_port: 1883         # MQTT broker port (defaults to 1883)
-  broker_user: username     # Username for MQTT credentials (required)
-  broker_pass: secret       # Password for MQTT credentials (required)
-  connection_retry: 10      # Seconds between reconnection attempts if disconnected (default 10)
+broker_host: 127.0.0.1      # MQTT broker address (required)
+broker_port: 1883           # MQTT broker port (defaults to 1883)
+broker_user: username       # Username for MQTT credentials (required)
+broker_pass: secret         # Password for MQTT credentials (required)
+retry_time: 10              # Seconds between reconnection attempts if disconnected (default 10)
 deviceName: Example Client  # Pretty/display name sent with this MQTT topic (required)
 client_id: example_client   # Client ID/name of this device for the MQTT broker (required)
 timezone: Europe/Brussels   # The system's local timezone (required)
 update_interval: 60         # Seconds between updating sensor values and publishing to broker (default 60)
 sensors:
-  board_make: true
+  board_manufacturer: true
   board_model: true
   cpu_arch: true
   cpu_model: true
@@ -28,10 +27,10 @@ sensors:
   os_distro: true
   os_updates: true
   net_ip: true
+  net_tx: true
+  net_rx: true
   net_wifi_strength: true
   net_wifi_ssid: true
-  net_up: true
-  net_down: true
   last_boot: true
   last_message: true
   disk_filesystem: true

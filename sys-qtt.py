@@ -1,17 +1,26 @@
 #!/usr/bin/env python3
 
-import sys, time, yaml, signal, pathlib, argparse, schedule
+import sys, time, yaml, json, signal, pathlib, argparse, schedule
 import paho.mqtt.client as mqtt
-from os import path
-from sysqtt.sensors import * 
+
+from sysqtt.c_print import *
 from sysqtt.utils import set_timezone
+from sysqtt.sensors import SensorValues, APT_DISABLED
+from sysqtt.sensor_object import SensorObject
 
 
 poll_interval = 60
-connection_retry = 10
+retry_time = 10
 mqtt_client = None
 device_name = None
-settings_dict = {}
+
+
+SETTINGS = {}
+SENSOR_JSON = 'sysqtt/sensor_base.json'
+SENSOR_BASE = {}
+
+sensor_list = []
+
 sensors_dict = {}
 disks_dict = {}
 mounted_disks = []
@@ -31,7 +40,8 @@ def signal_handler(signum, frame):
 def update_sensors():
     if not connected or program_killed:
         return None
-    c_print('Sending sensor payload...', status='wait')
+
+    c_print('Sending update sensor payload...', status='wait')
     payload_size = 0
     failed_size = 0
     payload_str = f'{{'
@@ -40,7 +50,7 @@ def update_sensors():
             break
         try:
             # Skip sensors that have been disabled or are missing
-            if sensor in mounted_disks or (settings_dict['sensors'][sensor] is not None and settings_dict['sensors'][sensor] == True):
+            if sensor in mounted_disks or (SETTINGS['sensors'][sensor] is not None and SETTINGS['sensors'][sensor] == True):
                 payload_str += f'"{sensor}": "{attr["function"]()}",'
                 payload_size += 1
         except Exception as e:
@@ -74,7 +84,7 @@ def send_config_message(mqttClient):
     payload_size = 0
     for sensor, attr in sensor_objects.items():
         try:
-            if sensor in mounted_disks or settings_dict['sensors'][sensor]:
+            if sensor in mounted_disks or SETTINGS['sensors'][sensor]:
                 mqttClient.publish(
                     topic=f'homeassistant/{attr["sensor_type"]}/{device_name}/{sensor}/config',
                     payload = (f'{{'
@@ -104,6 +114,7 @@ def send_config_message(mqttClient):
     c_print(f'{text_color.B_HLIGHT}{payload_size}{text_color.RESET} sensor config{"s" if payload_size > 1 else ""} '
             f'sent to MQTT broker.', tab=1, status='ok')
 
+
 def _parser():
     default_settings_path = str(pathlib.Path(__file__).parent.resolve()) + '/settings.yaml'
     """Generate argument parser"""
@@ -111,107 +122,91 @@ def _parser():
     parser.add_argument('--settings', help='path to the settings file', default=default_settings_path)
     return parser
 
-def set_defaults(settings):
-    missing_sensors = []
 
-    set_timezone(settings['timezone'])
+def import_settings_yaml():
+    """Use args to import settings.yaml"""
+    try:
+        args = _parser().parse_args()
+        settings_file = args.settings
+        with open(settings_file) as f:
+            settings_yaml = yaml.safe_load(f)
+        return settings_yaml
+    except Exception as e:
+        c_print(f'{text_color.B_HLIGHT}Could not find settings file. Please check the documentation: {e}', status='fail')
+        print()
+        sys.exit()
+
+
+def initialise_settings(settings):
+    default_settings = { 'broker_port': 1883, 'update_interval': 60, 'retry_time': 10 }
+    required_settings = ['sensors', 'broker_host', 'broker_user', 'broker_pass', 'timezone', 'devicename', 'client_id']
     
-    # Missing non-essential settings
-    global poll_interval
-    if 'update_interval' in settings:
-        poll_interval = settings['update_interval']
-    else:
-        c_print(f'{text_color.B_HLIGHT}update_interval{text_color.RESET} not defined in settings file. '
-        f'Setting to default value of {text_color.B_HLIGHT}{poll_interval}{text_color.RESET} seconds.', tab=1, status='warning')
+    SETTINGS = settings
 
-    global connection_retry
-    if 'connection_retry' in settings['mqtt']:
-        connection_retry = settings['mqtt']['connection_retry']
-    else:
-        c_print(f'{text_color.B_HLIGHT}connection_retry{text_color.RESET} not defined in mqtt settings. '
-        f'Setting to default value of {text_color.B_HLIGHT}{connection_retry}{text_color.RESET} seconds.', tab=1, status='warning')
-
-    if 'port' not in settings['mqtt']:
-        c_print(f'{text_color.B_HLIGHT}port{text_color.RESET} not defined in settings file. '
-        f'Setting to default value of {text_color.B_HLIGHT}1883{text_color.RESET}.', tab=1, status='warning')
-        settings['mqtt']['port'] = 1883
-
-    # Validate sensor entries
-    if 'sensors' not in settings or settings['sensors'] is None:
-        c_print(f'{text_color.B_FAIL}No sensors defined in settings file!', tab=1, status='warning')
-        # Add all sensors to default-add list and define sensor config as an empty dictionary
-        missing_sensors = sensor_objects
-        settings['sensors'] = {}
-    else:
-        # Add individual sensors if they are missing from the config
-        for sensor in sensor_objects:
-            if sensor not in settings['sensors'] or type(settings['sensors'][sensor]) is not bool:
-                missing_sensors.append(sensor)
-    # Print missing sensor
-    if len(missing_sensors) > 0:
-        sensors_to_add = ' '.join(missing_sensors)
-        c_print(f'{text_color.B_HLIGHT}{len(missing_sensors)}{text_color.RESET} sensor(s) not defined as true/false in settings '
-                f'file. Added them to the session by default:', tab=1, status='warning')
-        c_print(f'{text_color.B_HLIGHT}{sensors_to_add}', tab=2)
-        for sensor in missing_sensors:
-            settings['sensors'][sensor] = True
-
-    # Validate mounted disk entries
-    if 'disk_mounted' not in settings['sensors'] or settings['sensors']['disk_mounted'] is None:
-        settings['sensors']['disk_mounted'] = {}
-    else:
-        for disk in settings['sensors']['disk_mounted']:
-            if disk is None or len(disk) == 0:
-                c_print(f'{text_color.B_HLIGHT}{disk}{text_color.RESET} needs to be a valid path. Ignoring entry.', tab=2)
-    return settings
-
-def check_settings(settings):
-    # Abort if required settings missing
-    settings_list = ['mqtt', 'timezone', 'devicename', 'client_id', 'sensors']
-    mqtt_list = ['hostname', 'user', 'password']
-    for s in settings_list:
-        if s not in settings:
-            c_print(f'{text_color.B_HLIGHT}{s}{text_color.RESET} not defined in settings file. '
+    # Check for missing required settings
+    missing = [x for x in required_settings if x not in SETTINGS]
+    if len(missing) > 0:
+        for m in missing:
+            c_print(f'{text_color.B_HLIGHT}{m}{text_color.RESET} not defined in settings file. '
                     f'Please check the documentation.', tab=1, status='fail')
-            raise ProgramKilled
-        elif s == 'mqtt':
-            for m in mqtt_list:
-                if m not in settings['mqtt']:
-                    c_print(f'{text_color.B_HLIGHT}{m}{text_color.RESET} not defined in MQTT connection settings. '
-                            f'Please check the documentation.', tab=1, status='fail')
-                    raise ProgramKilled
-    # Warnings for missing or incompatible modules
-    if 'updates' in settings['sensors'] and apt_disabled:
-        c_print(f'Unable to import {text_color.B_HLIGHT}apt{text_color.RESET} module. removing from session.', tab=1, status='warning')
-        settings['sensors']['updates'] = False
+        raise ProgramKilled
 
-def add_disks():
-    """Add additional disks entered in 'disk_mounted' config."""
-    disk_dict = settings_dict['sensors']['disk_mounted']
-    if disk_dict is not None and len(disk_dict) != 0:
-        for disk in disk_dict:
-            if disk is not None and disk_dict[disk] is not None:
-                try:
-                    usage = get_disk_usage(disk_dict[disk])
-                    if usage:
-                        sensor_objects[f'disk_usage_{disk.lower()}'] = external_disk_object(disk, disk_dict[disk])
-                        # Add disk to list with formatted name, for when checking sensors against settings items
-                        mounted_disks.append(f'disk_usage_{disk.lower()}')
-                except Exception as e:
-                    c_print(f'Error while attempting to get usage from disk entry {text_color.B_HLIGHT}{disk}{text_color.RESET} with path '
-                            f'{text_color.B_HLIGHT}{disk_dict[disk]}{text_color.RESET}. Check settings file.', tab=1, status='warning')
+    # Apply defaults to missing settings
+    for d, val in default_settings:
+        if d not in SETTINGS:
+            c_print(f'{text_color.B_HLIGHT}{d}{text_color.RESET} not defined in settings file. '
+            f'Defaulting to {text_color.B_HLIGHT}{val}{text_color.RESET}.', tab=1, status='warning')
+            SETTINGS[d] = val
 
+    # Load sensor_base.json
+    try:
+        with open(SENSOR_JSON, 'r') as infile:
+            json.load(SENSOR_BASE, infile)
+    except Exception as e:
+        c_print(f'{text_color.B_HLIGHT}{SENSOR_JSON}{text_color.RESET} does not exist and is required. '
+        f'Please download Sys-QTT again.', tab=1, status='fail')
+        raise ProgramKilled
+
+    # Initial global config
+    set_timezone(SETTINGS['timezone'])
+
+
+def import_sensors():
+    # Main sensor import    
+    for sensor, toggle in SETTINGS['sensors']:
+        if sensor not in SENSOR_BASE:
+            c_print(f'{text_color.B_HLIGHT}{sensor}{text_color.RESET} missing from {text_color.B_HLIGHT}'
+                    f'{SENSOR_JSON}{text_color.RESET}. Skipping.', tab=1, status='warning')
+            continue
+        if sensor != 'disk_mounted':
+            if toggle == False:
+                continue
+            elif sensor in sensor_list:
+                c_print(f'Multiple {text_color.B_HLIGHT}{sensor}{text_color.RESET} in settings.yaml {text_color.B_HLIGHT}'
+                        f'{SENSOR_JSON}{text_color.RESET}. Ignoring duplicate.', tab=1, status='warning')
+                continue
             else:
-                # Skip disk not found. Could be worth sending "not mounted" as the value if users want to track mount status.
-                c_print(f'Disk {text_color.B_HLIGHT}{disk}{text_color.RESET} is empty. Check settings file.', tab=1, status='warning')
+                sensor_list[sensor] = SensorObject(SENSOR_BASE[sensor])
+        else: # Duplicating the code for mounted drive list isn't the neatest way, it'll do for now
+            for drive in sensor:
+                if drive in sensor_list:
+                    c_print(f'Multiple {text_color.B_HLIGHT}{drive}{text_color.RESET} in settings.yaml {text_color.B_HLIGHT}'
+                            f'{SENSOR_JSON}{text_color.RESET}. Ignoring duplicate.', tab=1, status='warning')
+                    continue
+                else:
+                    sensor_list[drive] = SensorObject(SENSOR_BASE[drive], path=sensor[drive])
+    
+    c_print(f'Imported {text_color.B_HLIGHT}{len(sensor_list)}{text_color.RESET} sensors.', tab=1, status='ok')
+
+
 
 def connect_to_broker():
     """Initiates connection with MQTT server and """
     while True:
         try:
-            c_print(f'Attempting to reach MQTT broker at {text_color.B_HLIGHT}{settings_dict["mqtt"]["hostname"]}{text_color.RESET} on port '
-                f'{text_color.B_HLIGHT}{settings_dict["mqtt"]["port"]}{text_color.RESET}...', status='wait')
-            mqtt_client.connect(settings_dict['mqtt']['hostname'], settings_dict['mqtt']['port'])
+            c_print(f'Attempting to reach MQTT broker at {text_color.B_HLIGHT}{SETTINGS["mqtt"]["hostname"]}{text_color.RESET} on port '
+                f'{text_color.B_HLIGHT}{SETTINGS["mqtt"]["port"]}{text_color.RESET}...', status='wait')
+            mqtt_client.connect(SETTINGS['mqtt']['hostname'], SETTINGS['mqtt']['port'])
             c_print(f'{text_color.B_OK}MQTT broker responded.', tab=1, status='ok')
             break
         except ConnectionRefusedError as e:
@@ -220,8 +215,8 @@ def connect_to_broker():
             c_print(f'Network I/O error. Is the network down? {text_color.B_FAIL}{e}', tab=1, status='fail')
         except Exception as e:
             c_print(f'Terminating connection attempt: {e}', tab=1, status='fail')
-        c_print(f'Trying again in {text_color.B_HLIGHT}{connection_retry}{text_color.RESET} seconds...', tab=1, status='wait')
-        time.sleep(connection_retry)
+        c_print(f'Trying again in {text_color.B_HLIGHT}{retry_time}{text_color.RESET} seconds...', tab=1, status='wait')
+        time.sleep(retry_time)
     try:
         send_config_message(mqtt_client)
     except Exception as e:
@@ -264,38 +259,30 @@ def on_message(client, userdata, message):
     if(message.payload.decode() == 'online'):
         send_config_message(client)
 
-
 if __name__ == '__main__':
     try:
         print()
         c_print(f'{text_color.B_NOTICE}Sys-QTT starting...')
         print()
-        # Find settings.yaml
-        try:
-            args = _parser().parse_args()
-            settings_file = args.settings
-            with open(settings_file) as f:
-                settings_dict = yaml.safe_load(f)
-        except Exception as e:
-            c_print(f'{text_color.B_HLIGHT}Could not find settings file. Please check the documentation: {e}', status='fail')
-            print()
-            sys.exit()
+
+        import_settings_yaml()
+        initialise_settings()
 
 
         c_print('Importing settings...', status='wait')
         # Make settings file keys all lowercase
-        settings_dict = {k.lower(): v for k,v in settings_dict.items()}
+        SETTINGS = {k.lower(): v for k,v in SETTINGS.items()}
         # Prep settings with defaults if keys missing
-        settings_dict = set_defaults(settings_dict)
+        SETTINGS = initialise_settings(SETTINGS)
         # Check for settings that will prevent the script from communicating with MQTT broker or break the script
-        check_settings(settings_dict)
+        check_settings(SETTINGS)
         # Build list of external disks
         add_disks()
 
-        device_name = settings_dict['devicename'].replace(' ', '_').lower()
-        display_name = settings_dict['devicename']
+        device_name = SETTINGS['devicename'].replace(' ', '_').lower()
+        display_name = SETTINGS['devicename']
 
-        mqtt_client = mqtt.Client(client_id=settings_dict['client_id'])
+        mqtt_client = mqtt.Client(client_id=SETTINGS['client_id'])
 
         # MQTT connection callbacks
         mqtt_client.on_connect = on_connect
@@ -304,9 +291,9 @@ if __name__ == '__main__':
 
         # set the client's availibilty will and user
         mqtt_client.will_set(f'sys-qtt/sensor/{device_name}/availability', 'offline', retain=True)
-        if 'user' in settings_dict['mqtt']:
+        if 'user' in SETTINGS['mqtt']:
             mqtt_client.username_pw_set(
-                settings_dict['mqtt']['user'], settings_dict['mqtt']['password']
+                SETTINGS['mqtt']['user'], SETTINGS['mqtt']['password']
             )
         
         # For gracefully exiting
