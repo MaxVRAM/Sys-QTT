@@ -50,7 +50,7 @@ def get_board_info(arg) -> str:
     _PATH_RPI = '/sys/firmware/devicetree/base/model'
     _PATH_OTHER = '/sys/devices/virtual/dmi/id/'
     # Raspberry Pi path first
-    if (reading := quick_cat(_PATH_RPI)) is not None and (rasp_find := reading.rfind(_RASP_NAME_CONST)) > 0:
+    if (reading := quick_cat(_PATH_RPI)) is not None and (rasp_find := reading.rfind(_RASP_NAME_CONST)) >= 0:
         if arg == 'board_vendor':
             return _RASP_NAME_CONST
         elif arg == 'board_name':

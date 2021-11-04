@@ -43,7 +43,7 @@ def quick_command(command:str, **kwargs):
         value = response.stdout.decode('utf-8', 'ignore')
         value = search(value, term) if term is not None else value
         if value is not None:
-            value = value.replace('\n','')
+            value = value.replace('\n','').rstrip('\x00')
             # String float needs to be converted to float before truncated to int
             return int(float(value)) if ret_type is int else ret_type(value)
     return None
