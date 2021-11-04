@@ -32,11 +32,22 @@ The `settings.yaml` file provides a selection from the following metrics:
 - [x] Comprehensive logging for debug
 - [x] Clean up the project file structure
 - [x] Add more CPU details
-- [ ] Move sensor definitions to external JSON file
-- [ ] Move semi-permanent sensor values (make, model, max, etc.) to attributes
+- [x] Complete refactor of the sensors code-base
+  - [x] Move sensor definitions to `sensor_details.json` file
+  - [x] Allow sensors to be defined as **static** or **dynamic**
+    - This is to save on CPU, since many of the sensors only need to be updated at reboot
+  - [x] Move sensors over to dictionaries of sensor objects
+  - [x] Re-organise scripts so clear their readibility
+- [ ] Add ability to create custom sensor (instead of all being hard-coded):
+  - [x] Build a set of bash script modules that can be called by custom sensors
+  - [ ] Add fields in `sensor_details.json` for custom bash calls and string searches 
+- [ ] Tidy Sys-QTT Home Assistant entities:
+  - [ ] Move semi-permanent sensor values (make, model, max, etc.) to attributes(?)
+  - [ ] Utilise Home Assistant v2021.11's [Entity Categories](https://www.home-assistant.io/blog/2021/11/03/release-202111/)
   - This will clean up the huge amount of sensors, especially with multiple Sys-QTT deployments
 - [ ] Install/update script
 - [ ] Web interface (yeah, I'm not a minimalist)
+- [ ] Build custom HA integration for managing remote Sys-QTT nodes
 
 ## Requirements
 

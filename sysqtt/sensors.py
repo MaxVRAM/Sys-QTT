@@ -2,22 +2,24 @@
 
 import time, psutil, socket
 from psutil import net_io_counters as net_tx
-from sysqtt.sensor_object import SensorObject
 from sysqtt.utils import quick_cat, quick_command, as_local, utc_from_ts, delta
+from sysqtt.c_print import *
 
 TX_FACTOR = 8 / 1024
 
 class Tx(object):
     def __init__(self, dir) -> None:
         self.dir = dir
-        self.value = { 'prev': 0, 'curr': 0, 'time': time.time(), 'diff': 0 }
+        self.values = { 'prev': 0, 'curr': 0, 'time': time.time(), 'diff': 0 }
     def update(self) -> float:
-        self.value['curr'] = net_tx(self.dir)
-        diff = delta(self.values)
-        return round(diff['diff'] * TX_FACTOR, 2)
+        self.values['curr'] = net_tx(0)[self.dir]
+        self.values = delta(self.values)
+        return round(self.values['diff'] * TX_FACTOR, 2)
 
 tx_up = Tx(0)
-tx_down = Tx(1)
+tx_down = Tx(0)
+
+tx_up.update()
 
 # Test for apt module for reporting update metric
 APT_DISABLED = True
@@ -70,12 +72,12 @@ def get_temp() -> float:
     """Return CPU temperature"""
     temp = 0
     ps_temp = psutil.sensors_temperatures()
-    if (temp := ps_temp['cpu_thermal']) is None and (temp := ps_temp['coretemp']) is None:
-        #k = ps_temp['k10temp']
-        temp += [t for t in ps_temp['k10temp']] / len(ps_temp['k10temp'])
-#        for t in k:
- #           temp += t.current
-  #      temp = temp / len(k)
+    if 'cpu_thermal' in ps_temp:
+        temp = ps_temp['cpu_thermal'].current
+    elif 'coretemp' in ps_temp:
+        temp = ps_temp['coretemp'].current
+    else:
+        temp += [t.current for t in ps_temp['k10temp']][0]
     return round(temp, 1)
 
 class SensorValues(object):
@@ -89,10 +91,10 @@ class SensorValues(object):
         'cpu_cores': lambda: quick_command('lscpu', term='Core(s) per socket:', ret_type=int),
         'cpu_max_speed': lambda: quick_command('lscpu', term='CPU max MHz:', ret_type=int),
         'os_distro': lambda: quick_cat('/etc/os-release', term='PRETTY_NAME=').strip('"'),
-        'last_boot': lambda: str(as_local(utc_from_ts(psutil.boot_time())).isoformat()),
-        'cpu_speed': lambda: quick_command("lscpu", "CPU MHz:", ret_type=int),
+        'last_boot': lambda: as_local(utc_from_ts(psutil.boot_time())).isoformat(),
+        'cpu_speed': lambda: quick_command('lscpu', term='CPU MHz:', ret_type=int),
         'cpu_temp': lambda: get_temp(),
-        'cpu_usage': lambda: float(psutil.cpu_percent(interval=None)),
+        'cpu_usage': lambda: psutil.cpu_percent(interval=None),
         'cpu_load_1m': lambda: psutil.getloadavg()[0],
         'cpu_load_5m': lambda: psutil.getloadavg()[1],
         'cpu_load_15m': lambda: psutil.getloadavg()[2],
@@ -108,19 +110,36 @@ class SensorValues(object):
         'last_message': lambda: str(as_local(utc_from_ts(time.time())).isoformat()),
         'disk_filesystem': lambda: psutil.disk_usage('/').percent}
 
-    def value(sensor: object):
-        if sensor.details.name in SensorValues.static_sensors:
-            return SensorValues.static_sensors[sensor.details.name]
-        elif sensor.details.name in SensorValues.sensor_functions:
-            return SensorValues.sensor_functions[sensor.details.name]
-        elif sensor.details.mounted:
-            return psutil.disk_usage(sensor.details.path).percent
+    def value(self, sensor):
+        try:
+            if sensor.details['name'] in SensorValues.static_sensors:
+                return SensorValues.static_sensors[sensor.details['name']]()
+            elif sensor.details['name'] in SensorValues.sensor_functions:
+                return SensorValues.sensor_functions[sensor.details['name']]()
+            elif sensor.details['mounted']:
+                return psutil.disk_usage(sensor.details['path']).percent
+            else:
+                c_print(f'Unable to obtain {text_color.B_HLIGHT}{sensor.details["name"]}{text_color.RESET} value.', tab=2, status='fail')
+                return None
+        except (TypeError, AttributeError):
+            c_print(f'{text_color.B_HLIGHT}{sensor.details["name"]}{text_color.RESET} function returned {text_color.B_HLIGHT}None{text_color.RESET}.', tab=2, status='fail')
+            return None
+        except Exception as e:
+            c_print(f'Error while getting {text_color.B_HLIGHT}{sensor.details["name"]}{text_color.RESET} value: {text_color.B_FAIL}{e}', tab=2, status='fail')
+            return None
 
-    def __init__(active_sensor_objects: list) -> None:
-        """Initialise the static sensor values if they're in the supplied active_sensor_object list"""
-        for s in active_sensor_objects:
-            if s.details.static == True:
-                if s.details.name in SensorValues.sensor_functions:
-                    SensorObject.values[s.details.name] = SensorValues.sensor_functions[s.details.name]
-                elif s.details.mounted:
-                    SensorObject.values[s.details.name] = psutil.disk_usage(s.details.path).percent
+    def build_statics(self, sensor_dict: dict) -> dict:
+        """Build the static sensor values if they're in the supplied dictionary"""
+        failed_sensors = []
+        for s in sensor_dict:
+            details = sensor_dict[s].details
+            if details['static'] == True:
+                try:
+                    if details['name'] in SensorValues.sensor_functions:
+                        SensorValues.static_sensors[details['name']] = SensorValues.sensor_functions[details['name']]
+                    elif s.details['mounted']:
+                        SensorValues.static_sensors[details['name']] = psutil.disk_usage(details['path']).percent
+                except Exception as e:
+                    c_print(f'Unable to build {text_color.B_HLIGHT}{details["name"]}{text_color.RESET} static value, removed from list: {text_color.B_FAIL}{e}', tab=1, status='fail')
+                    failed_sensors.append(s)
+        return failed_sensors

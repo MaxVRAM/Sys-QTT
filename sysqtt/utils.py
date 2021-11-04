@@ -6,8 +6,8 @@ TIMEZONE = None
 
 def delta(diff_dict):
     new_time = time.time()
-    diff = (diff_dict.curr - diff_dict.prev) / (new_time - diff_dict.t)
-    return_dict = { 'diff': diff, 'previous': diff_dict.curr, 'time': new_time }
+    diff = (diff_dict['curr'] - diff_dict['prev']) / (new_time - diff_dict['time'])
+    return_dict = { 'diff': diff, 'prev': diff_dict['curr'], 'time': new_time }
     return return_dict
 
 def set_timezone(tz):
@@ -43,6 +43,7 @@ def quick_command(command:str, **kwargs):
         value = response.stdout.decode('utf-8', 'ignore')
         value = search(value, term) if term is not None else value
         if value is not None:
+            value = value.replace('\n','')
             # String float needs to be converted to float before truncated to int
             return int(float(value)) if ret_type is int else ret_type(value)
     return None
