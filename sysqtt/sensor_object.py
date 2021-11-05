@@ -22,7 +22,6 @@ class SensorObject(object):
         topic = ''
         qos = 1
         retain = True
-        
         def __init__(self, s_obj: object, **kwargs) -> None:
             self.sensor_object = s_obj
             self.qos = kwargs['qos'] if 'qos' in kwargs else self.qos
@@ -33,7 +32,6 @@ class SensorObject(object):
                 self.topic = kwargs['topic']
             else:
                 self.topic = f'homeassistant/sensor/{SensorObject.device_name}/{_details["name"]}/config'
-
             # Payload in kwargs will override auto generated ones
             if 'payload' in kwargs:
                 self.payload = kwargs['payload']

@@ -108,7 +108,7 @@ def initialise_settings(settings) -> dict:
     for d in default_settings:
         if d not in settings:
             c_print(f'{text_color.B_HLIGHT}{d}{text_color.RESET} not defined in settings file. '
-            f'Defaulting to {text_color.B_HLIGHT}{default_settings[d]}{text_color.RESET}.', tab=1, status='warning')
+            f'Defaulting to {text_color.B_HLIGHT}{default_settings[d]}{text_color.RESET}.', tab=1, status='ok')
             settings[d] = default_settings[d]
 
     c_print(f'Settings initialised.', tab=1, status='ok')
