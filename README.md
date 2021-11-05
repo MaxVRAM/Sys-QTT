@@ -6,7 +6,7 @@ Sys-QTT is a light-weight, Python-based system metrics client for monitoring net
 Sys-QTT is based on Sennevds' [System Sensors](https://github.com/Sennevds/system_sensors) project, and has been developed primarily to use with Home Assistant, based on their [MQTT discovery documentation](https://www.home-assistant.io/docs/mqtt/discovery/).
 It should work with other any other MQTT broker/configuration, however, the sensor configuration messages are specific to Home Assistant.
 
-**If moving from System Sensors to Sys-QTT: The `settings.yaml` is incompatible between the two platforms. Please follow the instructions below to reeneter the settings from the supplied example directory.
+**If moving from System Sensors to Sys-QTT: The `settings.yaml` is incompatible between the two platforms. Please follow the instructions below to reeneter the settings from the supplied example directory.**
 
 
 ## Metrics List
