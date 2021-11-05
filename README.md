@@ -1,7 +1,7 @@
 
-# Sys-QTT
+# Sys-QTT | System Metrics MQTT Client
 
-Sys-QTT is a light-weight, Python-based system metrics service for monitoring networked devices. It periodically gathers a customisable selection of host machine metrics, and publishes the data to an MQTT broker/server of your choice.
+Sys-QTT is a light-weight, Python-based system metrics client for monitoring networked devices. It periodically gathers a customisable selection of host machine metrics, and publishes the data to an MQTT broker/server of your choice.
 
 Sys-QTT is based on Sennevds' [System Sensors](https://github.com/Sennevds/system_sensors) project, and has been developed primarily to use with Home Assistant, based on their [MQTT discovery documentation](https://www.home-assistant.io/docs/mqtt/discovery/).
 It should work with other any other MQTT broker/configuration, however, the sensor configuration messages are specific to Home Assistant.
@@ -191,7 +191,7 @@ Another option is to use [MQTT Explorer](http://mqtt-explorer.com/), which is an
 If the metrics aren't appearing in your Home Assistant listings, I recommend downloading and connecting MQTT Explorer to your broker.
 
 
-### Lovelace UI example
+## Home Assistant Example
 
 I have used following custom plugins for lovelace:
 
