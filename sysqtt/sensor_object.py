@@ -14,13 +14,6 @@ class SensorObject(object):
         # Assume dynamic value if no static keyword in config
         if 'static' not in self.details:
             self.details['static'] = False
-        # Detect mounted drive path objects
-        if 'path' in kwargs:
-            self.details['title'] = f'Disk {details["title"]}'
-            self.details['path'] = kwargs['path']
-            self.details['mounted'] = True
-        else:
-            self.details['mounted'] = False
         # Create a MQTT config for the new sensor object
         self.config = SensorObject.MqttConfig(self)
 
@@ -29,7 +22,6 @@ class SensorObject(object):
         topic = ''
         qos = 1
         retain = True
-        
         def __init__(self, s_obj: object, **kwargs) -> None:
             self.sensor_object = s_obj
             self.qos = kwargs['qos'] if 'qos' in kwargs else self.qos
@@ -40,7 +32,6 @@ class SensorObject(object):
                 self.topic = kwargs['topic']
             else:
                 self.topic = f'homeassistant/sensor/{SensorObject.device_name}/{_details["name"]}/config'
-
             # Payload in kwargs will override auto generated ones
             if 'payload' in kwargs:
                 self.payload = kwargs['payload']

@@ -1,26 +1,32 @@
 {
       "manufacturer": {
         "title": "System Manufacturer",
+        "static": "True",
         "icon": "domain"
       },
       "model": {
         "title": "System Model",
+        "static": "True",
         "icon": "package"
       },
       "arch": {
         "title": "CPU Architecture",
+        "static": "True",
         "icon": "chip"
       },
       "cpu": {
         "title": "CPU Model",
+        "static": "True",
         "icon": "cpu-64-bit"
       },
       "threads": {
         "title": "CPU Threads",
+        "static": "True",
         "icon": "cpu-64-bit"
       },
       "cores": {
         "title": "CPU Cores",
+        "static": "True",
         "icon": "cpu-64-bit"
       },
       "max_speed": {

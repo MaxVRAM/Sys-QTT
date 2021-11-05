@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+from os import stat_result
 import sys, time, yaml, json, signal, pathlib, argparse, schedule
 import paho.mqtt.client as mqtt
 
@@ -107,7 +108,7 @@ def initialise_settings(settings) -> dict:
     for d in default_settings:
         if d not in settings:
             c_print(f'{text_color.B_HLIGHT}{d}{text_color.RESET} not defined in settings file. '
-            f'Defaulting to {text_color.B_HLIGHT}{default_settings[d]}{text_color.RESET}.', tab=1, status='warning')
+            f'Defaulting to {text_color.B_HLIGHT}{default_settings[d]}{text_color.RESET}.', tab=1, status='ok')
             settings[d] = default_settings[d]
 
     c_print(f'Settings initialised.', tab=1, status='ok')
@@ -162,7 +163,9 @@ def import_sensors(sensor_dict: dict) -> dict:
                     else:
                         try:
                             drive_details['name'] = f'disk_{d.replace(" ","_").lower()}'
-                            sensor_dict[drive_details['name']] = SensorObject(drive_details, path=SETTINGS['sensors'][s][d])
+                            drive_details['title'] = f'Disk {d} Use'
+                            drive_details['path'] =  SETTINGS['sensors'][s][d]
+                            sensor_dict[drive_details['name']] = SensorObject(drive_details)
                         except Exception as e:
                             c_print(f'Unable add {text_color.B_HLIGHT}{d}{text_color.RESET} and has been removed '
                                     f'from this session: {text_color.B_FAIL}{e}', tab=1, status='fail')
@@ -287,11 +290,11 @@ def on_disconnect(client, userdata, rc):
     global connected
     connected = False
     print()
-    c_print(f'{text_color.B_FAIL}Disconnected!')
+    c_print(f'{text_color.B_FAIL}Disconnected!', tab=1, status='fail')
     if rc != 0:
-        c_print('Unexpected MQTT disconnection. Will attempt to re-establish connection.', tab=1, status='warning')
+        c_print('Unexpected MQTT disconnection. Will attempt to re-establish connection.', tab=2, status='fail')
     else:
-        c_print(f'RC value: {text_color.B_HLIGHT}{rc}', tab=1, status='info')
+        c_print(f'RC value: {text_color.B_HLIGHT}{rc}', tab=2, status='info')
     if not program_killed:
         print()
         connect_to_broker()
@@ -307,10 +310,7 @@ def on_message(client, userdata, message):
 
 if __name__ == '__main__':
     try:
-        print()
-        c_print(f'{text_color.B_NOTICE}Sys-QTT starting...')
-        print()
-
+        c_title('starting up...', '', 'OK')
         # Build global configurations
         SETTINGS = import_settings_yaml()
         SETTINGS = initialise_settings(SETTINGS)
@@ -328,22 +328,12 @@ if __name__ == '__main__':
         # Start the MQTT loop to maintain connection
         c_print('Establishing MQTT connection loop...', status='wait')
         MQTT_CLIENT.loop_start()
-
         # Wait for connection before starting the scheduled update job
         while not connected:
             time.sleep(1)
-
         JOB = create_scheduled_job()
-
-        print()
-        string_end = ''.join(['-' for _ in range(len(SensorObject.display_name))])
-        c_print('-------------------' + string_end, tab=1)
-        c_print(f'{text_color.B_HLIGHT}Sys-QTT {text_color.RESET}running on {text_color.B_OK}{SensorObject.display_name}', tab=1)
-        c_print('-------------------' + string_end, tab=1)
-        print()
-
+        c_title('now running on:', SensorObject.display_name, 'B_OK')
         time.sleep(1)
-
         # Publish inital sensor values
         update_sensors()
 
@@ -354,18 +344,17 @@ if __name__ == '__main__':
                 schedule.run_pending()
                 time.sleep(1)
             except ProgramKilled:
-                c_print(f'\n{text_color.B_FAIL}Program killed. Cleaning up...')
+                print()
+                c_print(f'{text_color.B_HLIGHT}Program killed:', tab=1, status='warning')
+                c_print(f'Cleaning up...', tab=2, status='wait')
                 schedule.cancel_job(JOB)
                 MQTT_CLIENT.loop_stop()
                 if MQTT_CLIENT.is_connected():
                     MQTT_CLIENT.publish(f'sys-qtt/sensor/{SensorObject.device_name}/availability', 'offline', retain=True)
                     MQTT_CLIENT.disconnect()
-                print()
-                c_print(f'{text_color.B_HLIGHT}Shutdown complete...')
-                print()
+                c_title('has shutdown', 'successfully', 'B_OK')
                 sys.stdout.flush()
                 break
     except Exception as e:
-        print()
-        c_print(f'{text_color.B_FAIL}Processed forced to exit: {e}')
-        print()
+        c_title('has shutdown from a', 'fatal error', 'B_FAIL')
+        c_print(str(e), tab=1, status='fail')

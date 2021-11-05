@@ -1,32 +1,28 @@
 
-# Sys-QTT
+# Sys-QTT | System Metrics MQTT Client
 
-Sys-QTT is a light-weight, Python-based system metrics service for monitoring networked devices. It periodically gathers a customisable selection of host machine metrics, and publishes the data to an MQTT broker/server of your choice.
+Sys-QTT is a light-weight, Python-based system metrics client for monitoring networked devices. It periodically gathers a customisable selection of host machine metrics, and publishes the data to an MQTT broker/server of your choice.
 
-Sys-QTT was designed to play nice with Home Assistant, based on their [MQTT discovery documentation](https://www.home-assistant.io/docs/mqtt/discovery/).
-It should work with other any other MQTT broker/configuration, however, keep in mind that some specifics may be related to Home Assistant.
+Sys-QTT is based on Sennevds' [System Sensors](https://github.com/Sennevds/system_sensors) project, and has been developed primarily to use with Home Assistant, based on their [MQTT discovery documentation](https://www.home-assistant.io/docs/mqtt/discovery/).
+It should work with other any other MQTT broker/configuration, however, the sensor configuration messages are specific to Home Assistant.
 
-### (Nov 2021) Warning
-
-As of November 2021, this fork of Sennevds/system_sensors is major under development.
-Some commits to `main` may create breaking changes to existing installations.
-I'll settle the project down soon and remove this warning.
+**If moving from System Sensors to Sys-QTT: The `settings.yaml` is incompatible between the two platforms. Please follow the instructions below to reeneter the settings from the supplied example directory.**
 
 
-## Metrics
+## Metrics List
 
 The `settings.yaml` file provides a selection from the following metrics:
 
-- **CPU**: make, model, temperature, number of threads and cores, usage, and current & max clock-speed
+- **CPU**: model, temperature, number of threads and cores, usage %, and current & max clock-speed
 - **Average Load**: 1min, 5min and 15min
-- **Storage**: system and mounted volume drive usages
+- **Storage**: file-system and mounted volume drive usages
 - **Memory**: physical memory usage, swap usage
-- **Network**: up/down throughput, local IP, WiFi signal strength and SSID
+- **Network**: tx/rx rate, local IP, WiFi signal strength and SSID
 - **OS**: hostname, distro name, distro version and pending OS updates
-- **Hardware**: system architecture, board make and model, power status (RPI only)
+- **Hardware**: system architecture, board make and model
 - **Timestamps**: last boot, last message received
 
-## Roadmap
+## Development Roadmap
 
 - [x] Add board make and model sensors
 - [x] Comprehensive logging for debug
@@ -34,9 +30,8 @@ The `settings.yaml` file provides a selection from the following metrics:
 - [x] Add more CPU details
 - [x] Complete refactor of the sensors code-base
   - [x] Move sensor definitions to `sensor_details.json` file
-  - [x] Allow sensors to be defined as **static** or **dynamic**
-    - This is to save on CPU, since many of the sensors only need to be updated at reboot
-  - [x] Move sensors over to dictionaries of sensor objects
+  - [x] Reduce function calls by defining sensors as **static** or **dynamic**
+  - [x] Move sensors to a run-time dictionary of sensor objects
   - [x] Re-organise scripts so clear their readibility
 - [ ] Add ability to create custom sensor (instead of all being hard-coded):
   - [x] Build a set of bash script modules that can be called by custom sensors
@@ -49,15 +44,16 @@ The `settings.yaml` file provides a selection from the following metrics:
 - [ ] Web interface (yeah, I'm not a minimalist)
 - [ ] Build custom HA integration for managing remote Sys-QTT nodes
 
-## Requirements
+## System Requirements
 
-**Platform**: This has only be tested on, and will likely only run on, Linux systems
+**Platform**: This has only be tested on, and will likely only run on, Linux systems.
 
 - Python **3.8+**
 - Several Python modules (installed via the supplied `requirements.txt` file)
-- An MQTT broker. For example:
+
+This project assumes you have an MQTT broker already running. For example:
   - (Home Assistant) [Mosquitto broker integration](https://github.com/home-assistant/addons/blob/master/mosquitto/DOCS.md)
-  - (Docker) [Eclipse-Mosquitto](https://hub.docker.com/_/eclipse-mosquitto)
+  - (Stand-alone) [Eclipse-Mosquitto](https://hub.docker.com/_/eclipse-mosquitto)
 
 ## Installation
 
@@ -149,7 +145,7 @@ System Sensors starting...
 </p>
 </details>
 
-## Usage
+## Starting Sys-QTT On Boot
 
 If the installation and test went well, you can now add a run service for Sys-QTT to run in the background on boot:
 
@@ -178,16 +174,24 @@ sudo systemctl start sys-qtt
 sudo systemctl status sys-qtt
 ```
 
-## Home Assistant
+## Debug
 
-If you've followed the installation and setup guide for Home Assistant's [Mosquitto Broker](https://github.com/home-assistant/addons/blob/master/mosquitto/DOCS.md), your Sys-QTT metrics should already in your Home Assistant device and entity listings.
+The last few lines of the Sys-QTT log output can be viewed via the `systemd` status command:
+```bash
+sudo systemctl status sys-qtt
+```
+If this doesn't provide any insights into the issue, stop the systemd service, and run Sys-QTT manually in the CLI:
+```bash
+sudo systemctl stop sys-qtt
+python3 ~/Sys-QTT/sys-qtt.py
+```
+Sys-QTT will then start in your CLI and display the log in full detail as it starts up.
 
-### Debug
-
-[MQTT Explorer](http://mqtt-explorer.com/) is an excellent tool for monitoring the activity of your MQTT data.
+Another option is to use [MQTT Explorer](http://mqtt-explorer.com/), which is an excellent tool for monitoring the activity of your MQTT data.
 If the metrics aren't appearing in your Home Assistant listings, I recommend downloading and connecting MQTT Explorer to your broker.
 
-### Lovelace UI example
+
+## Home Assistant Example
 
 I have used following custom plugins for lovelace:
 
