@@ -46,3 +46,13 @@ def c_print(message = '', **kwargs):
             dressing = f'{dressing}{text_color.HLIGHT}'
         print(f'{dressing}{message}{text_color.RESET}')
     stdout.flush()
+
+def c_title(message:str, subject:str, status:str):
+    TITLE = 'Sys-QTT'
+    string_length = len(TITLE + message + subject) + 2
+    string_end = ''.join(['-' for _ in range(string_length)])
+    print()
+    c_print(string_end, tab=1)
+    c_print(f'{text_color.B_HLIGHT}{TITLE}{text_color.RESET} {message} {getattr(text_color, status)}{subject}', tab=1)
+    c_print(string_end, tab=1)
+    print()

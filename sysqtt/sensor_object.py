@@ -14,13 +14,6 @@ class SensorObject(object):
         # Assume dynamic value if no static keyword in config
         if 'static' not in self.details:
             self.details['static'] = False
-        # Detect mounted drive path objects
-        if 'path' in kwargs:
-            self.details['title'] = f'Disk {details["title"]}'
-            self.details['path'] = kwargs['path']
-            self.details['mounted'] = True
-        else:
-            self.details['mounted'] = False
         # Create a MQTT config for the new sensor object
         self.config = SensorObject.MqttConfig(self)
 

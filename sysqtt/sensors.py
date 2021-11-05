@@ -116,13 +116,16 @@ class SensorValues(object):
                 return SensorValues.static_sensors[sensor.details['name']]()
             elif sensor.details['name'] in SensorValues.sensor_functions:
                 return SensorValues.sensor_functions[sensor.details['name']]()
-            elif sensor.details['mounted']:
+            elif sensor.details['path']:
                 return psutil.disk_usage(sensor.details['path']).percent
             else:
                 c_print(f'Unable to obtain {text_color.B_HLIGHT}{sensor.details["name"]}{text_color.RESET} value.', tab=2, status='fail')
                 return None
         except (TypeError, AttributeError):
             c_print(f'{text_color.B_HLIGHT}{sensor.details["name"]}{text_color.RESET} function returned {text_color.B_HLIGHT}None{text_color.RESET}.', tab=2, status='fail')
+            return None
+        except NameError as e:
+            c_print(f'{text_color.B_HLIGHT}{sensor.details["name"]}{text_color.RESET} sensor function is missing: {text_color.B_FAIL}{e}', tab=2, status='fail')
             return None
         except Exception as e:
             c_print(f'Error while getting {text_color.B_HLIGHT}{sensor.details["name"]}{text_color.RESET} value: {text_color.B_FAIL}{e}', tab=2, status='fail')
@@ -137,7 +140,7 @@ class SensorValues(object):
                 try:
                     if details['name'] in SensorValues.sensor_functions:
                         SensorValues.static_sensors[details['name']] = SensorValues.sensor_functions[details['name']]
-                    elif s.details['mounted']:
+                    elif 'path' in s.details:
                         SensorValues.static_sensors[details['name']] = psutil.disk_usage(details['path']).percent
                 except Exception as e:
                     c_print(f'Unable to build {text_color.B_HLIGHT}{details["name"]}{text_color.RESET} static value, removed from list: {text_color.B_FAIL}{e}', tab=1, status='fail')
