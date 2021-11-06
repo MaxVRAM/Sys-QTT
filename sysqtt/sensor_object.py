@@ -4,10 +4,8 @@ from sysqtt.c_print import *
 class SensorObject(object):
     make = get_board_info('board_vendor')
     model = get_board_info('board_name')
-
     display_name = ''
     device_name = ''
-
     def __init__(self, details: dict, **kwargs) -> None:
         self.details = details
         self.details['type'] = 'sensor'
@@ -16,7 +14,6 @@ class SensorObject(object):
             self.details['static'] = False
         # Create a MQTT config for the new sensor object
         self.config = SensorObject.MqttConfig(self)
-
     class MqttConfig(object):
         sensor_object = None
         topic = ''
