@@ -1,36 +1,63 @@
-#!/usr/bin/env python3
+# ------------------------------------------------------------------
+#    _________                      ______________________________  
+#   /   _____/__.__. ______         \_____  \__    ___/\__    ___/  
+#   \_____  <   |  |/  ___/     _____/  / \  \|    |     |    |     
+#   /        \___  |\___ \ |Sys-QTT|/   \_/.  \    |     |    |     
+#  /_______  / ____/____  >"``      \_____\ \_/____|     |____|     
+#          \/\/         \/                 \__>      o              
+#                                       System Metrics MQTT Client  
+#
+#              https://github.com/MaxVRAM/Sys-QTT                   
+#
+#    Sys-QTT is based on Sennevds 'System Sensors' project:
+#          https://github.com/Sennevds/system_sensors
+#
+# ------------------------------------------------------------------
 
-from os import stat_result
+
+from os import path
 import sys, time, yaml, json, signal, pathlib, argparse, schedule
 import paho.mqtt.client as mqtt
 
+# Sys-QTT project modules
 from sysqtt.c_print import *
 from sysqtt.utils import set_timezone
-from sysqtt.sensors import SensorValues, APT_DISABLED
+from sysqtt.sensor_values import SensorValues, APT_DISABLED
 from sysqtt.sensor_object import SensorObject
 
 MQTT_CLIENT = None
-SETTINGS = {}
-SENSOR_JSON = 'sysqtt/sensor_base.json'
-SENSOR_DETAILS = {}
+
+CONFIG_FILE = 'config.yaml'
+CONFIG_PATH = f'{str(pathlib.Path(__file__).parent.resolve())}/{CONFIG_FILE}'
+CONFIG = {}
+
+PROPERTIES_FILE = 'sensor_properties.json'
+PROPERTIES_PATH = f'{str(pathlib.Path(__file__).parent.resolve())}/sysqtt/{PROPERTIES_FILE}'
+PROPERTIES = {}
 SENSOR_DICT = {}
+
 VALUE_GENERATOR = SensorValues()
 
 connected = False
 program_killed = False
 
 
+
+# -------------------------
+# APPLICATION EXIT HANDLERS
+# -------------------------
 class ProgramKilled(Exception):
     pass
 
-# Graceful exit handler
 def signal_handler(signum, frame):
     global program_killed
     program_killed = True
     raise ProgramKilled
 
-
-def update_sensors():
+# -----------------------------------------------------------------
+# PERFORM DYNAMIC SENSOR VALUE FUNCTION CALLS AND PUBLISH TO BROKER
+# -----------------------------------------------------------------
+def publish_sensor_values():
     if not connected or program_killed:
         return None
     c_print('Sending update sensor payload...', status='wait')
@@ -39,21 +66,19 @@ def update_sensors():
     # Payload construction
     payload_str = f'{{'
     for s in SENSOR_DICT:
-        if program_killed:
-            sys.exit()
         try:
             payload_str += f'"{s}": "{VALUE_GENERATOR.value(SENSOR_DICT[s])}",'
             payload_size += 1
         except Exception as e:
-            c_print(f'Error while adding {text_color.B_HLIGHT}{s}{text_color.RESET} '
-                f'to update payload: {text_color.B_FAIL}{e}', tab=1, status='fail')
+            c_print(f'Error while adding {clr.B_HLT}{s}{clr.RESET} '
+                f'to update payload: {clr.B_FAIL}{e}', tab=1, status='fail')
             failed_size += 1
     payload_str = payload_str[:-1]
     payload_str += f'}}'
 
     # Report failed sensors
     if failed_size > 0:
-        c_print(f'{text_color.B_HLIGHT}{failed_size}{text_color.RESET} sensor '
+        c_print(f'{clr.B_HLT}{failed_size}{clr.RESET} sensor '
         f'update{"s" if failed_size > 1 else ""} unable to be sent.', tab=1, status='fail')
 
     # Now let's ship this sucker off!
@@ -61,265 +86,340 @@ def update_sensors():
         MQTT_CLIENT.publish(topic=f'sys-qtt/sensor/{SensorObject.device_name}/state',
             payload=payload_str, qos=1, retain=False)
     except Exception as e:
-        c_print(f'Unable to publish update payload: {text_color.B_FAIL}{e}', tab=1, status='fail')
+        c_print(f'Unable to publish update payload: {clr.B_FAIL}{e}', tab=1, status='fail')
 
-    c_print(f'{text_color.B_HLIGHT}{payload_size}{text_color.RESET} sensor '
+    c_print(f'{clr.B_HLT}{payload_size}{clr.RESET} sensor '
         f'update{"s" if payload_size > 1 else ""} sent to MQTT broker.', tab=1, status='ok')
-    c_print(f'{text_color.B_HLIGHT}{SETTINGS["update_interval"]}{text_color.RESET} seconds until next update...', tab=1, status='wait')
+    c_print(f'{clr.B_HLT}{CONFIG["general"]["update_interval"]}{clr.RESET} '
+            f'seconds until next update...', tab=1, status='wait')
 
 
-# Argument parser
+# ------------------------------------------------------------------
+# ARGUMENT PARSER
+# ------------------------------------------------------------------
 def _parser():
-    default_settings_path = str(pathlib.Path(__file__).parent.resolve()) + '/settings.yaml'
     """Generate argument parser"""
     parser = argparse.ArgumentParser()
-    parser.add_argument('--settings', help='path to the settings file', default=default_settings_path)
+    parser.add_argument('--config', help='path to the config.yaml file', default=CONFIG_PATH)
     return parser
 
-
-def import_settings_yaml():
-    """Import settings.yaml either via supplied argument, or check in default location"""
-    c_print('Importing settings.yaml...', status='wait')
+# ------------------------------------------------------------------
+# CHECK FOR CONFIG FILE AND IMPORT
+# ------------------------------------------------------------------
+def import_config_yaml():
+    """Import config.yaml either via supplied argument, or check in default location"""
+    c_print('Importing config.yaml...', status='wait')
     try:
         args = _parser().parse_args()
-        settings_file = args.settings
-        with open(settings_file) as f:
-            settings_yaml = yaml.safe_load(f)
-        c_print(f'Settings file found.', tab=1, status='ok')
-        return settings_yaml
+        config_file = args.config
+        with open(config_file) as f:
+            config_yaml = yaml.safe_load(f)
+        c_print(f'Config file found: {CONFIG_PATH}', tab=1, status='ok')
+        return config_yaml
     except Exception as e:
-        c_print(f'{text_color.B_HLIGHT}Could not find settings file. Please check the documentation: {e}', status='fail')
+        c_print(f'{clr.B_HLT}Could not find config.yaml file. Please check the documentation: {e}', status='fail')
         print()
         sys.exit()
 
+# ------------------------------------------------------------------
+# INITIALISE CONFIG FILES AND SET DEFAULTS IF REQUIRED
+# ------------------------------------------------------------------
+def initialise_config(config_dict) -> dict:
+    c_print('Processing config...', status='wait')
+    _required_general = ['broker_host', 'broker_user', 'broker_pass', 'device_name', 'client_id', 'timezone']
+    _default_config = { 'broker_port': 1883, 'update_interval': 60, 'retry_time': 10, 'allowed_sensor_fails': 0 }
 
-# Check that imported config is valid
-def initialise_settings(settings) -> dict:
-    c_print('Processing settings...', status='wait')
-    default_settings = { 'broker_port': 1883, 'update_interval': 60, 'retry_time': 10 }
-    required_settings = ['sensors', 'broker_host', 'broker_user', 'broker_pass', 'timezone', 'device_name', 'client_id']
-    # Check for missing required settings
-    if len(missing := [x for x in required_settings if x not in settings]) > 0:
+    # Check for missing required configs
+    if 'general' not in config_dict:
+        c_print(f'{clr.B_HLT}"general"{clr.RESET} category not defined in config file. '
+                f'Was it deleted by accident? Please recreate config.yaml using /examples/config.yaml.', tab=1, status='fail')
+        raise ProgramKilled
+    if 'sensors' not in config_dict:
+        c_print(f'{clr.B_HLT}"sensors"{clr.RESET} category not defined in config file. '
+                f'Was it deleted by accident? Please recreate config.yaml using /examples/config.yaml.', tab=1, status='fail')
+        raise ProgramKilled
+    if len(missing := [x for x in _required_general if x not in config_dict['general']]) > 0:
         for m in missing:
-            c_print(f'{text_color.B_HLIGHT}{m}{text_color.RESET} not defined in settings file. '
+            c_print(f'{clr.B_HLT}{m}{clr.RESET} not defined in config file and is required. '
                     f'Please check the documentation.', tab=1, status='fail')
         raise ProgramKilled
 
-    for d in default_settings:
-        if d not in settings:
-            c_print(f'{text_color.B_HLIGHT}{d}{text_color.RESET} not defined in settings file. '
-            f'Defaulting to {text_color.B_HLIGHT}{default_settings[d]}{text_color.RESET}.', tab=1, status='ok')
-            settings[d] = default_settings[d]
+    # Apply default configs if required
+    for d in _default_config:
+        if d not in config_dict['general']:
+            c_print(f'{clr.B_HLT}{d}{clr.RESET} not defined in config file. '
+            f'Defaulting to {clr.B_HLT}{_default_config[d]}{clr.RESET}.', tab=1, status='ok')
+            config_dict['general'][d] = _default_config[d]
+    c_print(f'Config initialised.', tab=1, status='ok')
 
-    c_print(f'Settings initialised.', tab=1, status='ok')
-    c_print('Importing default sensor details...', status='wait', tab=1)
-    global SENSOR_DETAILS
-    detail_file = str(pathlib.Path(__file__).parent.resolve()) + '/sysqtt/sensor_details.json'
+    # Apply timezone
+    set_timezone(config_dict['general']['timezone'])
+
+    # Import sensor properties
+    global PROPERTIES
+    c_print('Importing sensor properties...', status='wait', tab=1)
     try:
-        with open(detail_file, 'r') as infile:
-            SENSOR_DETAILS= json.load(infile)
+        with open(PROPERTIES_PATH, 'r') as infile:
+            PROPERTIES = json.load(infile)
     except Exception as e:
-        c_print(f'Could not load {text_color.B_HLIGHT}{detail_file}{text_color.RESET}. Check if it exists. If not, '
-        f'please download Sys-QTT again: {e}', tab=1, status='fail')
+        c_print(f'Could not load {clr.B_HLT}{PROPERTIES_PATH}{clr.RESET}. Check if it exists. If not, '
+        f'please download file again: {e}', tab=1, status='fail')
         raise ProgramKilled
-    c_print(f'Sensor details loaded.', tab=2, status='ok')
-    # Initial global config
-    set_timezone(settings['timezone'])
-    c_print(f'Settings applied successfully!', tab=1, status='ok')
-    return settings
+    c_print(f'Sensor properties loaded.', tab=2, status='ok')
 
+    # Validate imported sensor properties
+    for s in PROPERTIES:
+        sensor_prop = PROPERTIES[s]
+        # Add any missing properties
+        if 'icon' not in sensor_prop:
+            c_print(f'Sensor {clr.B_HLT}icon{clr.RESET} not defined for {clr.B_HLT}{sensor_prop}{clr.RESET}. Defaulting to {clr.B_HLT}'
+                    f'help{clr.RESET} icon. See {clr.B_HLT}{PROPERTIES_FILE}{clr.RESET} to resolve.', tab=1, status='warning')
+            sensor_prop['icon'] = 'help'
+        if 'title' not in sensor_prop:
+            c_print(f'Sensor {clr.B_HLT}title{clr.RESET} not defined for {clr.B_HLT}{sensor_prop}{clr.RESET}. Defaulting to {clr.B_HLT}'
+                    f'{sensor_prop["name"]}{clr.RESET}. See {clr.B_HLT}{PROPERTIES_FILE}{clr.RESET} to resolve.', tab=1, status='warning')
+            sensor_prop['title'] = sensor_prop['name']
 
-# Main sensor config import process
+    c_print(f'Config loaded successfully.', tab=1, status='ok')
+    return config_dict
+
+# -------------------------------------------------------------
+# COMBINE CONFIG.YAML AND SENSOR_DEFAULTS.JSON TO BUILD SENSORS
+# -------------------------------------------------------------
 def import_sensors(sensor_dict: dict) -> dict:
+    # Main sensor config import
     c_print('Importing sensor configurations...', status='wait')
-    for s in SETTINGS['sensors']:
-        if s not in SENSOR_DETAILS:
-            c_print(f'{text_color.B_HLIGHT}{s}{text_color.RESET} missing from {text_color.B_HLIGHT}'
-                    f'sensor details{text_color.RESET}. Skipping.', tab=1, status='warning')
+    for sensor in CONFIG['sensors']:
+        if sensor not in PROPERTIES:
+            c_print(f'{clr.B_HLT}{sensor}{clr.RESET} missing from {clr.B_HLT}{PROPERTIES_FILE}{clr.RESET}. Skipping.', tab=1, status='warning')
             continue
-        if s != 'disk_mounted':
-            if SETTINGS['sensors'][s] == False:
-                continue
-            elif s in sensor_dict:
-                c_print(f'Multiple {text_color.B_HLIGHT}{s}{text_color.RESET} in settings.yaml {text_color.B_HLIGHT}'
-                        f'{SENSOR_JSON}{text_color.RESET}. Ignoring duplicate. Remove from config to stop this message.', tab=1, status='warning')
-                continue
-            else:
-                try:
-                    SENSOR_DETAILS[s]['name']=s
-                    sensor_dict[s] = SensorObject(SENSOR_DETAILS[s])
-                except Exception as e:
-                    c_print(f'Unable add {text_color.B_HLIGHT}{s}{text_color.RESET} and has been removed '
-                            f'from this session: {text_color.B_FAIL}{e}', tab=1, status='fail')
-        else: # This isn't the neatest way, it'll do for now
-            if SETTINGS['sensors'][s] is not None:
-                drives = SETTINGS['sensors'][s]
-                for d in drives:
-                    drive_details = SENSOR_DETAILS[s]
-                    if d in sensor_dict:
-                        c_print(f'Multiple {text_color.B_HLIGHT}{d}{text_color.RESET} in settings.yaml {text_color.B_HLIGHT}'
-                                f'{SENSOR_JSON}{text_color.RESET}. Ignoring duplicate. Remove from config to stop this message.', tab=1, status='warning')
-                        continue
-                    else:
-                        try:
-                            drive_details['name'] = f'disk_{d.replace(" ","_").lower()}'
-                            drive_details['title'] = f'Disk {d} Use'
-                            drive_details['path'] =  SETTINGS['sensors'][s][d]
-                            sensor_dict[drive_details['name']] = SensorObject(drive_details)
-                        except Exception as e:
-                            c_print(f'Unable add {text_color.B_HLIGHT}{d}{text_color.RESET} and has been removed '
-                                    f'from this session: {text_color.B_FAIL}{e}', tab=1, status='fail')
+        # Skip if unknown value provided
+        if CONFIG['sensors'][sensor] not in [False, 'off', True, 'on', 'dynamic', 'static']:
+            c_print(f'Unknown value {clr.B_HLT}{CONFIG["sensors"][sensor]}{clr.RESET} for {clr.B_HLT}{sensor}'
+            f'{clr.RESET}. Allowed values: {clr.B_HLT}'
+                    f'"off", "on", "dynamic", "static"{clr.RESET}. Please check {clr.B_HLT}config.yaml'
+                    f'{clr.RESET}.', tab=1, status='warning')
+            continue
+        # Ignore sensors turned off
+        if CONFIG['sensors'][sensor] in ['off', False]:
+            continue
+        # Fitler duplicate entries
+        if sensor in sensor_dict:
+            c_print(f'Multiple {clr.B_HLT}{sensor}{clr.RESET} in {clr.B_HLT}config.yaml{clr.RESET}.'
+                    f'Ignoring duplicate. Remove from config to silence this warning.', tab=1, status='warning')
+            continue
+        # Add valid sensor to use in this session
+        try:
+            PROPERTIES[sensor]['name'] = sensor
+            PROPERTIES[sensor]['static'] = CONFIG['sensors'][sensor] == 'static'
+            sensor_dict[sensor] = SensorObject(PROPERTIES[sensor])
+        except Exception as e:
+            c_print(f'Unable add {clr.B_HLT}{sensor}{clr.RESET}and has been removed from session: {clr.B_FAIL}{e}', tab=1, status='fail')
 
-    c_print(f'Imported {text_color.B_HLIGHT}{len(sensor_dict)}{text_color.RESET} sensor details.', tab=1, status='ok')
-    # Initialise static sensors and remove ones that fail to generate a value
-    c_print(f'Initialising {text_color.B_HLIGHT}static{text_color.RESET} sensors...', tab=1, status='wait')
+    # Mounted disk sensor config import
+    _mnt = 'disk_mounted'
+    if _mnt in CONFIG:
+        for d in CONFIG[_mnt]:
+            # Skip duplicate names
+            if d in sensor_dict:
+                c_print(f'Mounted disk {clr.B_HLT}{d}{clr.RESET} has the same name as another sensor. '
+                        f'Remove from config or change its name to stop this message.', tab=1, status='warning')
+                continue
+            # Skip mounted disk sensor if no path provided
+            if CONFIG[_mnt][d] is None:
+                c_print(f'{clr.B_HLT}{d}{clr.RESET} mounted disk config entry is{clr.B_HLT}'
+                        f' missing a volume path{clr.RESET}. Skipping. Check config.yaml.', tab=1, status='warning')
+                continue
+            # Skip mounted drive paths that do not resolve a valid directory
+            if not path.isdir(CONFIG[_mnt][d]):
+                c_print(f'{clr.B_HLT}{d}{clr.RESET} mounted disk path {clr.B_HLT}{CONFIG[_mnt][d]}'
+                        f'{clr.RESET} is not a valid directory. Skipping. Check config.yaml.', tab=1, status='warning')
+                continue
+            # Add valid mounted disk sensor to use in this session
+            try:
+                drive_properties = PROPERTIES[_mnt]
+                drive_properties['name'] = f'disk_{d.replace(" ","_").lower()}'
+                drive_properties['title'] = f'Disk {d} Use'
+                drive_properties['path'] = CONFIG[_mnt][d]
+                drive_properties['static'] = False
+                # Name mounted disk sensor internally with "disk_" prefix name
+                sensor_dict[drive_properties['name']] = SensorObject(drive_properties)
+            except Exception as e:
+                c_print(f'Unable add {clr.B_HLT}{d}{clr.RESET} mounted disk and has been removed '
+                        f'from this session: {clr.B_FAIL}{e}', tab=1, status='fail')
+
+    c_print(f'Imported {clr.B_HLT}{len(sensor_dict)}{clr.RESET} sensor properties.', tab=1, status='ok')
+
+    # Initialise static sensors
+    c_print(f'Initialising {clr.B_HLT}static{clr.RESET} sensors...', tab=1, status='wait')
     failed_sensors = VALUE_GENERATOR.build_statics(sensor_dict)
     if len(failed_sensors) > 0:
         for f in failed_sensors:
             sensor_dict.pop(f)
-        c_print(f'{text_color.B_HLIGHT}{len(failed_sensors)}{text_color.RESET} static sensors have been removed from this session. '
+        c_print(f'{clr.B_HLT}{len(failed_sensors)}{clr.RESET} static sensors have been removed from this session. '
         f'Please check your config!', tab=2, status='warning')
-    c_print(f'Static sensors built!', tab=2, status='ok')
+    c_print(f'Static sensors built.', tab=2, status='ok')
     # Perform sensor value check on all sensor objects and remove ones that fail to generate a value
     c_print(f'Checking output of each sensor...', tab=1, status='wait')
     failed_sensors = {}
-    for s in sensor_dict:
-        if (value := VALUE_GENERATOR.value(sensor_dict[s])) is not None:
-            c_print(f'{text_color.B_HLIGHT}{s}{text_color.RESET} returned: {text_color.B_HLIGHT}{value}', tab=2, status='ok')
+    for sensor in sensor_dict:
+        if (value := VALUE_GENERATOR.value(sensor_dict[sensor])) is not None:
+            c_print(f'{clr.B_HLT}{sensor}{clr.RESET} returned: {clr.B_HLT}{value} '
+                    + (f'{sensor_dict[sensor].properties["unit"]}' if 'unit' in sensor_dict[sensor].properties else ''), tab=2, status='ok')
         else:
-            failed_sensors[s] = False
+            failed_sensors[sensor] = 'off'
     if len(failed_sensors) > 0:
         for f in failed_sensors:
-            #print(f'{f.details}')
             sensor_dict.pop(f)
-        c_print(f'{text_color.B_HLIGHT}{len(failed_sensors)}{text_color.RESET} sensors have been removed from this session. '
+        c_print(f'{clr.B_HLT}{len(failed_sensors)}{clr.RESET} sensors have been removed from this session. '
         f'Please check your config!', tab=1, status='warning')
     # Return the new sensor list
-    c_print(f'{text_color.B_HLIGHT}{len(sensor_dict)}{text_color.RESET} sensors have been commited to the session.', tab=1, status='ok')
+    c_print(f'{clr.B_HLT}{len(sensor_dict)}{clr.RESET} sensors have been commited to the session.', tab=1, status='ok')
     return sensor_dict
 
-
-# Performed once the client has connected to the broker
+# ------------------------------------
+# PUBLISH SENSOR MQTT CONFIG TO BROKER
+# ------------------------------------
 def publish_sensor_configs(mqttClient):
     c_print('Publishing sensor configurations...', tab=1, status='wait')
     payload_size = 0
     for s in SENSOR_DICT:
         try:
-            mqttClient.publish(topic=SENSOR_DICT[s].config.topic, payload=SENSOR_DICT[s].config.payload, qos=SENSOR_DICT[s].config.qos, retain=SENSOR_DICT[s].config.retain)
+            mqttClient.publish(topic=SENSOR_DICT[s].config.topic,
+                                payload=SENSOR_DICT[s].config.payload,
+                                qos=SENSOR_DICT[s].config.qos,
+                                retain=SENSOR_DICT[s].config.retain)
             payload_size += 1
             #print(f'{SENSOR_DICT[s].config.payload}')
         except Exception as e:
-            c_print(f'Could not publish {text_color.B_HLIGHT}{SENSOR_DICT[s].details["name"]}{text_color.RESET} sensor configuration: '
-                    f'{text_color.B_FAIL}{e}', tab=2, status='warning')
+            c_print(f'Could not publish {clr.B_HLT}{SENSOR_DICT[s].properties["name"]}{clr.RESET} sensor configuration: '
+                    f'{clr.B_FAIL}{e}', tab=2, status='warning')
     mqttClient.publish(f'sys-qtt/sensor/{SensorObject.device_name}/availability', 'online', retain=True)
-    c_print(f'{text_color.B_HLIGHT}{payload_size}{text_color.RESET} sensor config{"s" if payload_size != 1 else ""} '
-            f'and {text_color.B_HLIGHT}online{text_color.RESET} status to broker.', tab=2, status='ok')
+    c_print(f'{clr.B_HLT}{payload_size}{clr.RESET} sensor config{"s" if payload_size != 1 else ""} '
+            f'and {clr.B_HLT}online{clr.RESET} status to broker.', tab=2, status='ok')
 
 
-# Create a new client object
+# ---------------------------
+# MQTT CLIENT OBJECT CREATION
+# ---------------------------
 def create_mqtt_client() -> mqtt.Client:
-    client = mqtt.Client(client_id=SETTINGS['client_id'])
+    client = mqtt.Client(client_id=CONFIG['general']['client_id'])
     # Add MQTT connection callbacks
     client.on_connect = on_connect
     client.on_disconnect = on_disconnect
     client.on_message = on_message
     # Set the client will and authentication
     client.will_set(f'sys-qtt/sensor/{SensorObject.device_name}/availability', 'offline', retain=True)
-    client.username_pw_set(SETTINGS['broker_user'], SETTINGS['broker_pass'])
+    client.username_pw_set(CONFIG['general']['broker_user'], CONFIG['general']['broker_pass'])
     return client
 
-# Building the scheduler job for posting updates
+# ----------------------------------
+# INITIALISE SENSOR UPDATE SCHEDULER
+# ----------------------------------
 def create_scheduled_job():
     try:
         # Start the update job
-        c_print(f'Adding {text_color.B_HLIGHT}sensor update{text_color.RESET} job on '
-                f'{text_color.B_HLIGHT}{SETTINGS["update_interval"]}{text_color.RESET} second schedule...', status='wait')
-        job = schedule.every(SETTINGS["update_interval"]).seconds.do(update_sensors)
-        c_print(f'{text_color.B_HLIGHT}{schedule.get_jobs()}', tab=1, status='ok')
+        c_print(f'Adding {clr.B_HLT}sensor update{clr.RESET} job on '
+                f'{clr.B_HLT}{CONFIG["general"]["update_interval"]}{clr.RESET} second schedule...', status='wait')
+        job = schedule.every(CONFIG["general"]["update_interval"]).seconds.do(publish_sensor_values)
+        c_print(f'{clr.B_HLT}{schedule.get_jobs()}', tab=1, status='ok')
         return job
     except Exception as e:
-        c_print(f'Unable to add job: {text_color.B_FAIL}{e}', tab=1, status='fail')
+        c_print(f'Unable to add job: {clr.B_FAIL}{e}', tab=1, status='fail')
         sys.exit()
         
-
-### TODO - ADD RETRY NUMBER IN SETTINGS.YAML
+# ----------------------
+# CONNECT TO MQTT BROKER
+# ----------------------
 def connect_to_broker():
     """Initiates connection with MQTT server """
     while True:
         try:
-            c_print(f'Attempting to reach MQTT broker at {text_color.B_HLIGHT}{SETTINGS["broker_host"]}{text_color.RESET} on port '
-                f'{text_color.B_HLIGHT}{SETTINGS["broker_port"]}{text_color.RESET}...', status='wait')
-            MQTT_CLIENT.connect(SETTINGS['broker_host'], SETTINGS['broker_port'])
-            c_print(f'{text_color.B_OK}MQTT broker responded.', tab=1, status='ok')
+            c_print(f'Attempting to reach MQTT broker at {clr.B_HLT}{CONFIG["general"]["broker_host"]}{clr.RESET} on port '
+                f'{clr.B_HLT}{CONFIG["general"]["broker_port"]}{clr.RESET}...', status='wait')
+            MQTT_CLIENT.connect(CONFIG['general']['broker_host'], CONFIG['general']['broker_port'])
+            c_print(f'{clr.B_OK}MQTT broker responded.', tab=1, status='ok')
             break
         except ConnectionRefusedError as e:
-            c_print(f'MQTT broker is down or unreachable: {text_color.B_FAIL}{e}', tab=1, status='fail')
+            c_print(f'MQTT broker is down or unreachable: {clr.B_FAIL}{e}', tab=1, status='fail')
         except OSError as e:
-            c_print(f'Network I/O error. Is the network down? {text_color.B_FAIL}{e}', tab=1, status='fail')
+            c_print(f'Network I/O error. Is the network down? {clr.B_FAIL}{e}', tab=1, status='fail')
         except Exception as e:
-            c_print(f'Terminating connection attempt: {text_color.B_FAIL}{e}', tab=1, status='fail')
-        c_print(f'Trying again in {text_color.B_HLIGHT}{SETTINGS["retry_time"]}{text_color.RESET} seconds...', tab=1, status='wait')
-        time.sleep(SETTINGS["retry_time"])
+            c_print(f'Terminating connection attempt: {clr.B_FAIL}{e}', tab=1, status='fail')
+        c_print(f'Trying again in {clr.B_HLT}{CONFIG["general"]["retry_time"]}{clr.RESET} seconds...', tab=1, status='wait')
+        time.sleep(CONFIG["general"]["retry_time"])
     try:
         publish_sensor_configs(MQTT_CLIENT)
     except Exception as e:
-        c_print(f'Unable to publish sensor config: {text_color.B_FAIL}{e}', tab=1, status='fail')
+        c_print(f'Unable to publish sensor config: {clr.B_FAIL}{e}', tab=1, status='fail')
         raise ProgramKilled
 
 
-# MQTT client callbacks
+# -----------------------------------------------------
+# (CALLBACK) WHEN CONNECTION WITH BROKER IS ESTABLISHED
+# -----------------------------------------------------
 def on_connect(client, userdata, flags, rc):
     if rc == 0:
         try:
             client.subscribe('hass/status')
             client.publish(f'sys-qtt/sensor/{SensorObject.device_name}/availability', 'online', retain=True)
-            c_print(f'{text_color.B_OK}Success!', tab=1, status='ok')
-            c_print(f'Updated {text_color.B_HLIGHT}{SensorObject.device_name}{text_color.RESET} client on broker with {text_color.B_HLIGHT}online'
-                    f'{text_color.RESET} status.', tab=1, status='info')
+            c_print(f'{clr.B_OK}Success!', tab=1, status='ok')
+            c_print(f'Updated {clr.B_HLT}{SensorObject.device_name}{clr.RESET} client on broker with '
+                    f'{clr.B_HLT}online{clr.RESET} status.', tab=1, status='info')
             global connected
             connected = True
         except Exception as e:
-            c_print(f'Unable to publish {text_color.B_HLIGHT}online{text_color.RESET} status to broker: {text_color.B_FAIL}{e}', tab=1, status='fail')
+            c_print(f'Unable to publish {clr.B_HLT}online{clr.RESET} status to broker: '
+                    f'{clr.B_FAIL}{e}', tab=1, status='fail')
     elif rc == 5:
         c_print('Authentication failed.', tab=1, status='fail')
         raise ProgramKilled
     else:
         c_print('Failed to connect.', tab=1, status='fail')
 
+# ----------------------------------------------------
+# (CALLBACK) WHEN CLIENT LOOSES CONNECTION WITH BROKER
+# ----------------------------------------------------
 def on_disconnect(client, userdata, rc):
     global connected
     connected = False
     print()
-    c_print(f'{text_color.B_FAIL}Disconnected!', tab=1, status='fail')
+    c_print(f'{clr.B_FAIL}Disconnected!', tab=1, status='fail')
     if rc != 0:
         c_print('Unexpected MQTT disconnection. Will attempt to re-establish connection.', tab=2, status='fail')
     else:
-        c_print(f'RC value: {text_color.B_HLIGHT}{rc}', tab=2, status='info')
+        c_print(f'RC value: {clr.B_HLT}{rc}', tab=2, status='info')
     if not program_killed:
         print()
         connect_to_broker()
 
+# ----------------------------------------------------
+# (CALLBACK) WHEN CLIENT RECEIVES MESSAGES FROM BROKER
+# ----------------------------------------------------
 def on_message(client, userdata, message):
-    c_print(f'Message received from broker: {text_color.B_HLIGHT}{message.payload.decode()}', status='info')
+    c_print(f'Message received from broker: {clr.B_HLT}{message.payload.decode()}', status='info')
     if(message.payload.decode() == 'online'):
         publish_sensor_configs(client)
 
 
 
-
-
+# ----------------
+# MAIN APPLICATION
+# ----------------
 if __name__ == '__main__':
     try:
+        # ----------------------
+        # SYS-QTT INITIALISATION
+        # ----------------------
         c_title('starting up...', '', 'OK')
         # Build global configurations
-        SETTINGS = import_settings_yaml()
-        SETTINGS = initialise_settings(SETTINGS)
-        SensorObject.display_name = SETTINGS['device_name']
-        SensorObject.device_name = SETTINGS['device_name'].replace(' ', '_').lower()
+        CONFIG = import_config_yaml()
+        CONFIG = initialise_config(CONFIG)
+        SensorObject.display_name = CONFIG['general']['device_name']
+        SensorObject.device_name = SensorObject.display_name.replace(' ', '_').lower()
         SENSOR_DICT = import_sensors(SENSOR_DICT)
         MQTT_CLIENT = create_mqtt_client()
-        c_print(f'{text_color.B_OK}Local configuration complete.', tab=1, status='ok')
-        
+        c_print(f'{clr.B_OK}Local configuration complete.', tab=1, status='ok')
         # Add handlers for gracefully exiting
         signal.signal(signal.SIGTERM, signal_handler)
         signal.signal(signal.SIGINT, signal_handler)
@@ -328,16 +428,18 @@ if __name__ == '__main__':
         # Start the MQTT loop to maintain connection
         c_print('Establishing MQTT connection loop...', status='wait')
         MQTT_CLIENT.loop_start()
-        # Wait for connection before starting the scheduled update job
+        # Wait to connect with broker before continuing. TODO Add retry timeout/bail
         while not connected:
             time.sleep(1)
         JOB = create_scheduled_job()
         c_title('now running on:', SensorObject.display_name, 'B_OK')
         time.sleep(1)
         # Publish inital sensor values
-        update_sensors()
+        publish_sensor_values()
 
-        # Program loop
+        # ----------------------------------
+        # MQTT CLIENT/BROKER CONNECTION LOOP
+        # ----------------------------------
         while True:
             try:
                 sys.stdout.flush()
@@ -345,9 +447,11 @@ if __name__ == '__main__':
                 time.sleep(1)
             except ProgramKilled:
                 print()
-                c_print(f'{text_color.B_HLIGHT}Program killed:', tab=1, status='warning')
+                c_print(f'{clr.B_HLT}Program killed:', tab=1, status='warning')
                 c_print(f'Cleaning up...', tab=2, status='wait')
+                # Pull down the scheduler
                 schedule.cancel_job(JOB)
+                # Close all MQTT services
                 MQTT_CLIENT.loop_stop()
                 if MQTT_CLIENT.is_connected():
                     MQTT_CLIENT.publish(f'sys-qtt/sensor/{SensorObject.device_name}/availability', 'offline', retain=True)
@@ -355,6 +459,8 @@ if __name__ == '__main__':
                 c_title('has shutdown', 'successfully', 'B_OK')
                 sys.stdout.flush()
                 break
+    # Primary abort exception handling
     except Exception as e:
         c_title('has shutdown from a', 'fatal error', 'B_FAIL')
         c_print(str(e), tab=1, status='fail')
+        print()

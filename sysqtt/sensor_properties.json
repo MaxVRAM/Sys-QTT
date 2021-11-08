@@ -1,130 +1,130 @@
 {
-      "manufacturer": {
-        "title": "System Manufacturer",
+      "board_make": {
+        "title": "System Make",
         "static": "True",
         "icon": "domain"
       },
-      "model": {
+      "board_model": {
         "title": "System Model",
         "static": "True",
         "icon": "package"
       },
-      "arch": {
-        "title": "CPU Architecture",
+      "cpu_arch": {
+        "title": "CPU Arch",
         "static": "True",
         "icon": "chip"
       },
-      "cpu": {
+      "cpu_model": {
         "title": "CPU Model",
         "static": "True",
         "icon": "cpu-64-bit"
       },
-      "threads": {
+      "cpu_threads": {
         "title": "CPU Threads",
         "static": "True",
         "icon": "cpu-64-bit"
       },
-      "cores": {
+      "cpu_cores": {
         "title": "CPU Cores",
         "static": "True",
         "icon": "cpu-64-bit"
       },
-      "max_speed": {
-        "title": "CPU Max",
+      "cpu_max": {
+        "title": "CPU Max Clock",
         "unit": "GHz",
         "icon": "cpu-64-bit"
       },
-      "clock": {
+      "cpu_clock": {
         "title": "CPU Clock",
         "unit": "GHz",
         "icon": "cpu-64-bit"
       },
-      "temp": {
-        "title": "CPU Temperature",
+      "cpu_temp": {
+        "title": "CPU Temp",
         "class": "temperature",
         "unit": "°C",
         "icon": "thermometer"
       },
-      "usage": {
+      "cpu_usage": {
         "title": "CPU Usage",
         "unit": "%",
         "icon": "cpu-64-bit"
       },
-      "load_1m": {
-        "title": "Load 1m",
+      "cpu_load_1m": {
+        "title": "CPU Load 1m",
         "icon": "cpu-64-bit"
       },
-      "load_5m": {
-        "title": "Load 5m",
+      "cpu_load_5m": {
+        "title": "CPU Load 5m",
         "icon": "cpu-64-bit"
       },
-      "load_15m": {
-        "title": "Load 15m",
+      "cpu_load_15m": {
+        "title": "CPU Load 15m",
         "icon": "cpu-64-bit"
       },
-      "memory": {
+      "memory_ram": {
         "title": "Memory Physical",
         "unit": "%",
         "icon": "memory"
       },
-      "swap": {
+      "memory_swap": {
         "title": "Memory Swap",
         "unit": "%",
         "icon": "harddisk"
       },
-      "hostname": {
+      "os_hostname": {
         "title": "OS Hostname",
         "icon": "card-account-details"
       },
-      "distro": {
+      "os_distro": {
         "title": "OS Distro",
         "icon": "linux"
       },
-      "updates": {
+      "os_updates": {
         "title": "OS Updates",
         "icon": "package-down"
       },
-      "ip": {
+      "net_ip": {
         "title": "Network IP",
         "icon": "ip"
       },
-      "tx": {
+      "net_tx": {
         "title": "Network Tx",
         "unit": "Kbps",
         "icon": "upload-network"
       },
-      "rx": {
+      "net_rx": {
         "title": "Network Rx",
         "unit": "Kbps",
         "icon": "download-network"
       },
-      "wifi": {
+      "wifi_strength": {
         "title": "WiFi Strength",
         "class": "signal_strength",
         "unit": "dBm",
         "icon": "wifi-strength-3"
       },
-      "ssid": {
+      "wifi_ssid": {
         "title": "WiFi SSID",
         "class": "signal_strength",
         "icon": "wifi"
       },
-      "boot": {
+      "last_boot": {
         "title": "Last Boot",
         "class": "timestamp",
         "icon": "clock"
       },
-      "message": {
+      "last_message": {
         "title": "Last Message",
         "class": "timestamp",
         "icon": "clock-check"
       },
-      "filesystem": {
+      "disk_system": {
         "title": "Disk Use",
         "unit": "%",
         "icon": "harddisk"
       },
-      "mounted": {
+      "disk_mounted": {
         "title": "Disk Use",
         "unit": "%",
         "icon": "harddisk",
