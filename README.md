@@ -6,7 +6,7 @@ Sys-QTT is a light-weight, Python-based system metrics client for monitoring net
 Sys-QTT is based on Sennevds' [System Sensors](https://github.com/Sennevds/system_sensors) project, and has been developed primarily to use with Home Assistant, based on their [MQTT discovery documentation](https://www.home-assistant.io/docs/mqtt/discovery/).
 It should work with other any other MQTT broker/configuration, however, the sensor configuration messages are specific to Home Assistant.
 
-**If moving from System Sensors to Sys-QTT: The `settings.yaml` is incompatible between the two platforms. Please follow the instructions below to reeneter the settings from the supplied example directory.**
+**The config/settings for this fork is not compatible with System Sensors. Please follow the instructions below to reeneter the settings from the supplied example directory.**
 
 
 ## Metrics List
@@ -77,16 +77,16 @@ The following steps will configure the host and perform a test-run of Sys-QTT:
   sudo apt-get install python3-apt
   ```
 
-5. Make a copy of the example setting file and update it with your MQTT broker details, client ID and client device name:
+5. Make a copy of the example config file and update it with your MQTT broker details, client ID and client device name:
 
   ```bash
-  cp examples/settings.yaml settings.yaml && nano settings.yaml
+  cp examples/config.yaml settings.yaml && nano config.yaml
   ```
 
 6. Test the script within your CLI session, any issues will be clearly logged:
 
   ```bash
-  python3 sys-qtt.py --settings settings.yaml
+  python3 sys-qtt.py --settings config.yaml
   ```
 
 ### Output Example
@@ -95,50 +95,67 @@ The following steps will configure the host and perform a test-run of Sys-QTT:
 <p>
 
 ```log
-System Sensors starting...
+❯ python3 sys-qtt.py
 
-[•] Importing settings...
+    -----------------------
+    Sys-QTT starting up... 
+    -----------------------
+
+[•] Importing config.yaml...
+    [✓] Config file found: /home/maxvram/Sys-QTT/config.yaml
+[•] Processing config...
+    [✓] Config initialised.
+    [•] Importing sensor properties...
+        [✓] Sensor properties loaded.
+    [✓] Config loaded successfully.
+[•] Importing sensor configurations...
+    [✓] Imported 25 sensor properties.
+    [•] Initialising static sensors...
+        [✓] Static sensors built.
+    [•] Checking output of each sensor...
+        [✓] board_make returned: Intel Corporation 
+        [✓] board_model returned: NUC8BEB 
+        [✓] cpu_arch returned: x86_64 
+        [✓] cpu_model returned: Intel(R) Core(TM) i5-8259U CPU @ 2.30GHz 
+        [✓] cpu_threads returned: 8 
+        [✓] cpu_cores returned: 4 
+        [✓] cpu_max returned: 3.8 GHz
+        [✓] cpu_clock returned: 2.3 GHz
+        [✓] cpu_temp returned: 38.0 °C
+        [✓] cpu_usage returned: 11.9 %
+        [✓] cpu_load_1m returned: 1.73 
+        [✓] cpu_load_5m returned: 1.09 
+        [✓] cpu_load_15m returned: 1.02 
+        [✓] memory_ram returned: 41.6 %
+        [✓] memory_swap returned: 97.5 %
+        [✓] os_hostname returned: NUC 
+        [✓] os_distro returned: Ubuntu 20.04.3 LTS 
+        [✓] os_updates returned: 0 
+        [✓] net_ip returned: 192.168.20.5 
+        [✓] net_tx returned: 0 Kbps
+        [✓] net_rx returned: 0 Kbps
+        [✓] last_boot returned: 2021-10-27T01:18:41+11:00 
+        [✓] last_message returned: 2021-11-09T00:24:34.510696+11:00 
+        [✓] disk_system returned: 28.3 %
+        [✓] disk_storage returned: 0.3 %
+    [✓] 25 sensors have been commited to the session.
     [✓] Local configuration complete.
 [•] Attempting to reach MQTT broker at 192.168.20.5 on port 1883...
     [✓] MQTT broker responded.
     [•] Publishing sensor configurations...
-        [✓] board_make: Micro-Star International Co., Ltd.
-        [✓] board_model: MPG X570 GAMING PLUS (MS-7C37)
-        [✓] temperature: 51.8
-        [✓] cpu_make: AuthenticAMD
-        [✓] cpu_model: AMD Ryzen 5 3600X 6-Core Processor
-        [✓] cpu_threads: 12
-        [✓] cpu_cores: 6
-        [✓] cpu_max_speed: 4408.5928
-        [✓] cpu_speed: 2200.000
-        [✓] cpu_usage: 20.0
-        [✓] load_1m: 1.29
-        [✓] load_5m: 1.47
-        [✓] load_15m: 1.58
-        [✓] memory_use: 25.2
-        [✓] swap_usage: 0.0
-        [✓] hostname: maxvram-desktop
-        [✓] ip: 192.168.70.20
-        [✓] os: Ubuntu 20.04.3 LTS
-        [✓] arch: x86_64
-        [✓] updates: 0
-        [✓] net_tx: 17.62
-        [✓] net_rx: 0.00
-        [✓] last_boot: 2021-11-01T10:21:05+11:00
-        [✓] last_message: 2021-11-01T16:33:53.297987+11:00
-        [✓] disk_use: 43.3
-        [✓] disk_use_storage: 35.9
-    [✓] 26 sensor configs sent to MQTT broker.
+        [✓] 25 sensor configs and online status to broker.
 [•] Establishing MQTT connection loop...
     [✓] Success!
-    [i] Updated desktop client on broker with online status.
+    [i] Updated nuc_i5 client on broker with online status.
 [•] Adding sensor update job on 30 second schedule...
-    [✓] [Every 30 seconds do update_sensors() (last run: [never], next run: 2021-11-01 16:35:47)]
+    [✓] [Every 30 seconds do publish_sensor_values() (last run: [never], next run: 2021-11-09 00:25:05)]
 
-[✓] Sys-QTT running on Desktop
+    ------------------------------
+    Sys-QTT now running on: NUC i5
+    ------------------------------
 
-[•] Sending sensor payload...
-    [✓] 26 sensor updates sent to MQTT broker.
+[•] Sending update sensor payload...
+    [✓] 25 sensor updates sent to MQTT broker.
     [•] 30 seconds until next update...
 ```
 
