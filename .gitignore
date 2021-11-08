@@ -107,6 +107,6 @@ venv.bak/
 
 # Custom stuff
 .mypy_cache/
-/settings.yaml
+config.yaml
 .vscode
 *.code-workspace
