@@ -1,0 +1,124 @@
+# ------------------------------------------------------------------
+#    _________                      ______________________________  
+#   /   _____/__.__. ______         \_____  \__    ___/\__    ___/  
+#   \_____  <   |  |/  ___/     _____/  / \  \|    |     |    |     
+#   /        \___  |\___ \ |Sys-QTT|/   \_/.  \    |     |    |     
+#  /_______  / ____/____  >"``      \_____\ \_/____|     |____|     
+#          \/\/         \/                 \__>      o              
+#                                       System Metrics MQTT Client  
+#
+#              https://github.com/MaxVRAM/Sys-QTT                   
+#
+#    Sys-QTT is based on Sennevds 'System Sensors' project:
+#          https://github.com/Sennevds/system_sensors
+#
+# ------------------------------------------------------------------
+
+
+# --------------
+# General Config
+# --------------
+general:
+
+    # MQTT Broker Connection Config
+    # -----------------------------
+    # Broker IP address or hostname both work (required)
+    broker_host: 192.168.20.5
+    # Port that the clients can reach the broker on (default: 1883)
+    broker_port: 1883
+    # Client credentials for MQTT broker (required)
+    broker_user: mqtt_user
+    broker_pass: Guru8-Emoticon-Angler-Strength
+    # Seconds between reconnection attempts (default: 10)
+    retry_time: 10
+
+    # Client Details
+    # --------------
+    # Pretty client name (required) - can contain spaces and caps
+    device_name: NUC i5
+    # Client ID (required) - lower-case and spaced with '_'
+    client_id: nuc_i5
+    # Timezone for all timecode values on client (required)
+    timezone: Australia/Melbourne
+
+    # Sensor Config
+    # -------------
+    # Seconds between sensor updates/publishing (default: 60)
+    update_interval: 30
+    # Number of times to allow a sensor to fail their value call
+    # before ignoring them in the current session.
+    # Use "-1" to never remove failed sensors (default: 0)
+    allowed_sensor_fails: 0
+
+
+# --------------
+# Sensor Entries
+# --------------
+sensors:
+
+# Each sensor need to be defined with one of the following:
+#
+# - DYNAMIC / ON (default)
+# Sensors set as 'dynamic' will call a function to recalculate it's
+# every time the update is called. 
+#
+# - STATIC
+# Setting a sensor to 'static' forces a sensor value to be populated
+# only once, when the script is first started. Helpful to reduce
+# function calls for un-changing values, such as CPU model, number
+# of threads, and other hardware details.
+#
+# - OFF
+# Removes the sensor from the MQTT config payload, update payloads,
+# and prevents them from being called on each sensor update.
+
+    # Motherboard
+    board_make: static
+    board_model: static
+    # CPU
+    cpu_arch: static
+    cpu_model: static
+    cpu_threads: static
+    cpu_cores: static
+    cpu_max: static
+    cpu_clock: dynamic
+    cpu_temp: dynamic
+    cpu_usage: dynamic
+    cpu_load_1m: dynamic
+    cpu_load_5m: dynamic
+    cpu_load_15m: dynamic
+    # Memory
+    memory_ram: dynamic
+    memory_swap: dynamic
+    # Operating System
+    os_hostname: dynamic
+    os_distro: static
+    os_updates: dynamic
+    # Networking
+    net_ip: dynamic
+    net_tx: dynamic
+    net_rx: dynamic
+    wifi_strength: off
+    wifi_ssid: off
+    # Timestamps
+    last_boot: static
+    last_message: dynamic
+    # OS System Volume
+    disk_system: dynamic
+
+
+# ---------------------------
+# Mounted Disk Sensor Entries
+# ---------------------------
+disk_mounted:
+# Mounted Disk Sensors return the used % of a mounted volume.
+# These are "dynamic" sensors only. Conmment out to turn off.
+#
+# You only need to provide a "pretty name" and path. The sensor
+# id name will be converted to lowercase "_" spaced strings and
+# are appended with a "disk_" prefix.
+#
+# Add mounted disks by using the following format:
+# 
+#   <pretty_name>: <mounted_path>
+    Storage: /media/storage

@@ -1,6 +1,6 @@
 from sys import stdout
 
-class text_color:
+class clr:
     RESET = '\033[0m' #LIGHT GREY
     # Normal
     OK = '\033[0;32;48m' #GREEN
@@ -19,7 +19,7 @@ class text_color:
     B_OK = '\033[1;32;48m' #GREEN
     B_WARNING = '\033[1;33;48m' #YELLOW
     B_FAIL = '\033[1;31;48m' #RED
-    B_HLIGHT = '\033[1;37;48m' #WHITE
+    B_HLT = '\033[1;37;48m' #WHITE
     B_NOTICE = '\033[1;34;48m' #BLUE
     B_DARK = '\033[1;30;48m' #DARK GREY
 
@@ -33,18 +33,18 @@ def c_print(message = '', **kwargs):
                 dressing = f'    {dressing}'
         if 'status' in kwargs and type(kwargs['status']) is not None:
             if kwargs['status'] == 'info':
-                dressing = f'{dressing}{text_color.B_DARK}[{text_color.B_HLIGHT}i{text_color.B_DARK}]{text_color.RESET} '
+                dressing = f'{dressing}{clr.B_DARK}[{clr.B_HLT}i{clr.B_DARK}]{clr.RESET} '
             if kwargs['status'] == 'wait':
-                dressing = f'{dressing}{text_color.B_DARK}[{text_color.B_HLIGHT}•{text_color.B_DARK}]{text_color.RESET} '
+                dressing = f'{dressing}{clr.B_DARK}[{clr.B_HLT}•{clr.B_DARK}]{clr.RESET} '
             elif kwargs['status'] == 'ok':
-                dressing = f'{dressing}{text_color.B_DARK}[{text_color.B_OK}✓{text_color.B_DARK}]{text_color.RESET} '
+                dressing = f'{dressing}{clr.B_DARK}[{clr.B_OK}✓{clr.B_DARK}]{clr.RESET} '
             elif kwargs['status'] == 'warning':
-                dressing = f'{dressing}{text_color.B_DARK}[{text_color.B_WARNING}!{text_color.B_DARK}]{text_color.RESET} '
+                dressing = f'{dressing}{clr.B_DARK}[{clr.B_WARNING}!{clr.B_DARK}]{clr.RESET} '
             elif kwargs['status'] == 'fail':
-                dressing = f'{dressing}{text_color.B_DARK}[{text_color.B_FAIL}✗{text_color.B_DARK}]{text_color.RESET} '
+                dressing = f'{dressing}{clr.B_DARK}[{clr.B_FAIL}✗{clr.B_DARK}]{clr.RESET} '
         else:
-            dressing = f'{dressing}{text_color.HLIGHT}'
-        print(f'{dressing}{message}{text_color.RESET}')
+            dressing = f'{dressing}{clr.HLIGHT}'
+        print(f'{dressing}{message}{clr.RESET}')
     stdout.flush()
 
 def c_title(message:str, subject:str, status:str):
@@ -53,6 +53,6 @@ def c_title(message:str, subject:str, status:str):
     string_end = ''.join(['-' for _ in range(string_length)])
     print()
     c_print(string_end, tab=1)
-    c_print(f'{text_color.B_HLIGHT}{TITLE}{text_color.RESET} {message} {getattr(text_color, status)}{subject}', tab=1)
+    c_print(f'{clr.B_HLT}{TITLE}{clr.RESET} {message} {getattr(clr, status)}{subject}', tab=1)
     c_print(string_end, tab=1)
     print()
