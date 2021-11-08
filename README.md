@@ -1,5 +1,14 @@
-
-# Sys-QTT | System Metrics MQTT Client
+```
+------------------------------------------------------------------
+   _________                      ______________________________  
+  /   _____/__.__. ______         \_____  \__    ___/\__    ___/  
+  \_____  <   |  |/  ___/     _____/  / \  \|    |     |    |     
+  /        \___  |\___ \ |Sys-QTT|/   \_/.  \    |     |    |     
+ /_______  / ____/____  >"``      \_____\ \_/____|     |____|     
+         \/\/         \/                 \__>      o              
+                                      System Metrics MQTT Client  
+------------------------------------------------------------------
+```
 
 Sys-QTT is a light-weight, Python-based system metrics client for monitoring networked devices. It periodically gathers a customisable selection of host machine metrics, and publishes the data to an MQTT broker/server of your choice.
 
