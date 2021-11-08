@@ -20,7 +20,7 @@ It should work with other any other MQTT broker/configuration, however, the sens
 
 ## Metrics List
 
-The `settings.yaml` file provides a selection from the following metrics:
+The `config.yaml` file provides a selection from the following metrics:
 
 - **CPU**: model, temperature, number of threads and cores, usage %, and current & max clock-speed
 - **Average Load**: 1min, 5min and 15min
