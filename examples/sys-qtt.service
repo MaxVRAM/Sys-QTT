@@ -5,7 +5,7 @@ After=multi-user.target
 [Service]
 User=maxvram
 Type=idle
-ExecStart=/usr/bin/python3 /home/maxvram/Sys-QTT/sys-qtt.py --settings /home/maxvram/Sys-QTT/config.yaml
+ExecStart=/usr/bin/python3 /home/maxvram/Sys-QTT/sys-qtt.py --config /home/maxvram/Sys-QTT/config.yaml
 
 [Install]
 WantedBy=multi-user.target
