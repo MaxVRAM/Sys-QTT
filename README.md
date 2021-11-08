@@ -89,13 +89,13 @@ The following steps will configure the host and perform a test-run of Sys-QTT:
 5. Make a copy of the example config file and update it with your MQTT broker details, client ID and client device name:
 
   ```bash
-  cp examples/config.yaml settings.yaml && nano config.yaml
+  cp examples/config.yaml config.yaml && nano config.yaml
   ```
 
 6. Test the script within your CLI session, any issues will be clearly logged:
 
   ```bash
-  python3 sys-qtt.py --settings config.yaml
+  python3 sys-qtt.py --config config.yaml
   ```
 
 ### Output Example
