@@ -96,7 +96,7 @@ class SensorValues(object):
         'cpu_threads': lambda: quick_command('lscpu', term='CPU(s):', ret_type=int),
         'cpu_cores': lambda: quick_command('lscpu', term='Core(s) per socket:', ret_type=int),
         'cpu_max': lambda: quick_command('lscpu', term='CPU max MHz:', ret_type=int) / 1000,
-        'cpu_clock': lambda: quick_command('lscpu', term='CPU MHz:', ret_type=int) / 1000,
+        'cpu_clock': lambda: round(psutil.cpu_freq().current / 1000, 2),
         'cpu_temp': lambda: get_temp(),
         'cpu_usage': lambda: psutil.cpu_percent(interval=None),
         'cpu_load_1m': lambda: psutil.getloadavg()[0],
