@@ -1,5 +1,14 @@
-
-# Sys-QTT | System Metrics MQTT Client
+```
+------------------------------------------------------------------
+   _________                      ______________________________  
+  /   _____/__.__. ______         \_____  \__    ___/\__    ___/  
+  \_____  <   |  |/  ___/     _____/  / \  \|    |     |    |     
+  /        \___  |\___ \ |Sys-QTT|/   \_/.  \    |     |    |     
+ /_______  / ____/____  >"``      \_____\ \_/____|     |____|     
+         \/\/         \/                 \__>      o              
+                                      System Metrics MQTT Client  
+------------------------------------------------------------------
+```
 
 Sys-QTT is a light-weight, Python-based system metrics client for monitoring networked devices. It periodically gathers a customisable selection of host machine metrics, and publishes the data to an MQTT broker/server of your choice.
 
@@ -80,13 +89,13 @@ The following steps will configure the host and perform a test-run of Sys-QTT:
 5. Make a copy of the example config file and update it with your MQTT broker details, client ID and client device name:
 
   ```bash
-  cp examples/config.yaml settings.yaml && nano config.yaml
+  cp examples/config.yaml config.yaml && nano config.yaml
   ```
 
 6. Test the script within your CLI session, any issues will be clearly logged:
 
   ```bash
-  python3 sys-qtt.py --settings config.yaml
+  python3 sys-qtt.py --config config.yaml
   ```
 
 ### Output Example
