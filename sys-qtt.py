@@ -218,7 +218,7 @@ def import_sensors(sensor_dict: dict) -> dict:
 
     # Mounted disk sensor config import
     _mnt = 'disk_mounted'
-    if _mnt in CONFIG:
+    if _mnt in CONFIG and CONFIG[_mnt] is not None:
         for d in CONFIG[_mnt]:
             # Skip duplicate names
             if d in sensor_dict:
