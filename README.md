@@ -74,25 +74,25 @@ The following steps will configure the host and perform a test-run of Sys-QTT:
   git clone https://github.com/MaxVRAM/Sys-QTT.git && cd Sys-QTT
   ```
 
-2. Install the required modules:
-
-  ```bash
-  pip3 install -r requirements.txt
-  ```
-
-4. Ensure the `python3-apt` package is installed:
+2. Ensure the `python3-apt` package is installed:
 
   ```bash
   sudo apt-get install python3-apt
   ```
+  
+3. Install the required modules:
 
-5. Make a copy of the example config file and update it with your MQTT broker details, client ID and client device name:
+  ```bash
+  python3 -m pip install -r requirements.txt
+  ```
+
+4. Make a copy of the example config file and update it with your MQTT broker details, client ID and client device name:
 
   ```bash
   cp examples/config.yaml config.yaml && nano config.yaml
   ```
 
-6. Test the script within your CLI session, any issues will be clearly logged:
+5. Test the script within your CLI session, any issues will be clearly logged:
 
   ```bash
   python3 sys-qtt.py --config config.yaml
