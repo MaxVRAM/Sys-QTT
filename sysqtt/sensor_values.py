@@ -129,23 +129,23 @@ class SensorValues(object):
             elif sensor.properties['name'] in SensorValues.sensor_functions:
                 return SensorValues.sensor_functions[sensor.properties['name']]()
             else:
-                c_print(f'Unable to find {clr.B_HLT}{sensor.properties["name"]}'
-                        f'{clr.RESET} in the session sensor objects.', tab=2, status='fail')
+                c_print(f'Unable to find {col.B_HLT}{sensor.properties["name"]}'
+                        f'{col.RESET} in the session sensor objects.', tab=2, status='fail')
                 return None
         # None returns
         except (TypeError, AttributeError):
-            c_print(f'{clr.B_HLT}{sensor.properties["name"]}{clr.RESET} function returned '
-                    f'{clr.B_HLT}None{clr.RESET}.', tab=2, status='fail')
+            c_print(f'{col.B_HLT}{sensor.properties["name"]}{col.RESET} function returned '
+                    f'{col.B_HLT}None{col.RESET}.', tab=2, status='fail')
             return None
         # Missing functions in lambda expression
         except NameError as e:
-            c_print(f'{clr.B_HLT}{sensor.properties["name"]}{clr.RESET} sensor '
-                    f'function is missing: {clr.B_FAIL}{e}', tab=2, status='fail')
+            c_print(f'{col.B_HLT}{sensor.properties["name"]}{col.RESET} sensor '
+                    f'function is missing: {col.B_FAIL}{e}', tab=2, status='fail')
             return None
         # General exception
         except Exception as e:
-            c_print(f'Error while getting {clr.B_HLT}{sensor.properties["name"]}{clr.RESET} '
-                    f'value: {clr.B_FAIL}{e}', tab=2, status='fail')
+            c_print(f'Error while getting {col.B_HLT}{sensor.properties["name"]}{col.RESET} '
+                    f'value: {col.B_FAIL}{e}', tab=2, status='fail')
             return None
 
     # Called when the application is first initialised to bake sensors defined as static
@@ -159,11 +159,11 @@ class SensorValues(object):
                     if properties['name'] in SensorValues.sensor_functions:
                         SensorValues.static_sensors[properties['name']] = SensorValues.sensor_functions[properties['name']]()
                     else:
-                        c_print(f'Could not find function for {clr.B_HLT}{properties["name"]}{clr.RESET} '
+                        c_print(f'Could not find function for {col.B_HLT}{properties["name"]}{col.RESET} '
                                 f'static sensor. Removing from this session. Please remove from config.', tab=2, status='warning')
                         failed_sensors.append(s)
                 except Exception as e:
-                    c_print(f'Unable to build {clr.B_HLT}{properties["name"]}{clr.RESET} static value, '
-                            f'removed from list: {clr.B_FAIL}{e}', tab=1, status='fail')
+                    c_print(f'Unable to build {col.B_HLT}{properties["name"]}{col.RESET} static value, '
+                            f'removed from list: {col.B_FAIL}{e}', tab=1, status='fail')
                     failed_sensors.append(s)
         return failed_sensors
